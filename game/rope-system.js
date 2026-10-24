@@ -1,5 +1,6 @@
 import {Vector3} from './vendor/three.module.js';
 import {closestSegments,CONTACT_RADIUS} from './rope.js';
+import {visitRopePairs as pairs} from './rope-broadphase.js';
 const GAP=CONTACT_RADIUS*2,SKIN=GAP*1.25,GUARD=GAP*.25;
 const v=()=>new Vector3();
 // Conservative advancement: the distance between two deforming segments is
@@ -18,15 +19,6 @@ export function segmentTOI(a0,a1,b0,b1,A0,A1,B0,B1,radius=GUARD){
   }
   // An unresolved grazing case is blocked conservatively, never waved through.
   return {...hit,time:t};
-}
-function edges(ropes,swept){const out=[];ropes.forEach((r,ri)=>{if(r.broken>=0)return;for(let i=0;i<r.points.length-1;i++){const a=r.points[i],b=r.points[i+1],p=swept?r.previous[i]:a,q=swept?r.previous[i+1]:b;out.push({r,ri,i,min:[Math.min(a.x,b.x,p.x,q.x),Math.min(a.y,b.y,p.y,q.y),Math.min(a.z,b.z,p.z,q.z)],max:[Math.max(a.x,b.x,p.x,q.x),Math.max(a.y,b.y,p.y,q.y),Math.max(a.z,b.z,p.z,q.z)]});}});return out;}
-function pairs(ropes,swept,radius,visit){
-  const es=edges(ropes,swept);
-  for(let x=0;x<es.length;x++)for(let y=x+1;y<es.length;y++){
-    const a=es[x],b=es[y];if(a.ri===b.ri&&b.i-a.i<2)continue;
-    if(a.min[0]>b.max[0]+radius||b.min[0]>a.max[0]+radius||a.min[1]>b.max[1]+radius||b.min[1]>a.max[1]+radius||a.min[2]>b.max[2]+radius||b.min[2]>a.max[2]+radius)continue;
-    visit(a,b);
-  }
 }
 function normalFor(a,b,h,old){
   const n=old.a.clone().sub(old.b);

@@ -1,6 +1,6 @@
 # TIRANTE · El pulso del viento
 
-Proyecto completo, versión 1.7.0, preparado para un repositorio nuevo en GitHub y un Web Service en Render.
+Proyecto completo, versión 1.8.0, preparado para un repositorio nuevo en GitHub y un Web Service en Render.
 
 ## Instalación actual en Render
 
@@ -22,6 +22,17 @@ La instalación actual usa el plan gratuito, una instancia y `DATA_DIR=/tmp/tira
 - Party local contra 1–3 NPC, Rastro de luz contrarreloj y duelo online para dos personas.
 - Interfaz compacta para móvil, renderer WebGL y alternativa Canvas.
 - Servidor Node.js, base SQLite, almacenamiento de estampados y pruebas automatizadas.
+
+## Cambios de la versión 1.8.0
+
+- Campo verde de 800 × 800 m, con el radio de vuelo de 150 m despejado y plano. Árboles y montañas más lejos, cámara y niebla ajustadas al escenario ampliado.
+- Se retiró el pasto animado. La vela usa 112 vértices compartidos en vez de 972; la resolución interna se limita más durante los duelos para reducir trabajo gráfico en pantallas de alta densidad.
+- Papel al 40 % de opacidad, también con estampados y en el modo Canvas. Palillos, tirantes y contorno conservan su visibilidad.
+- Respuesta de giro aumentada un 10 %, compartida por el cliente y el servidor.
+- Las colisiones descartan antes los segmentos alejados, conservando las comprobaciones continuas, el orden de resolución, el desgaste y los cortes.
+- El duelo online enlaza cada actualización con la posición que está dibujada, evitando saltos cuando varía el intervalo de red.
+
+Resultados y alcance de las pruebas en [docs/VALIDACION.md](docs/VALIDACION.md).
 
 ## Probar en tu computador
 
@@ -116,7 +127,7 @@ Las pruebas cubren vuelo, viento, tirantes, giros, boost, energía, hilo, cortes
 
 ## Procedencia y alcance de la exportación
 
-Se conserva el código de juego de TIRANTE 1.7.0, origen `9fa2925c52902c2aa917e38b6d5f9cdfbb350248`. Esta edición sustituye el alojamiento de Sites/Workers por Node.js y el almacenamiento D1/R2 por SQLite y archivos. El adaptador D1 original permanece en `server/rooms.js` como referencia; el servidor de esta edición usa `SQLiteRooms`.
+El juego parte de TIRANTE 1.7.0, origen `9fa2925c52902c2aa917e38b6d5f9cdfbb350248`. Esta edición sustituye el alojamiento de Sites/Workers por Node.js y el almacenamiento D1/R2 por SQLite y archivos. El adaptador D1 original permanece en `server/rooms.js` como referencia; el servidor de esta edición usa `SQLiteRooms`.
 
 El ZIP contiene el código y los recursos necesarios para desplegar. Las salas activas y los estampados ya almacenados en el alojamiento anterior no se transfieren. En el dominio nuevo debes volver a cargar tus imágenes; los ajustes guardados en el navegador pertenecen al dominio anterior.
 

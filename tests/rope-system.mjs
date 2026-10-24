@@ -51,8 +51,8 @@ console.log(`PASS: continuous crossings, parallel/grazing/near-miss motion, self
 const {OnlineGame}=await import('../game/online.js'),{snapshot}=await import('../server/online-match.js');
 const server=new Commission(pilot(v(-2,5,0),v(2,5,0)));server.rival=pilot(v(0,4,.2),v(0,6,.2));server.state='playing';
 const room={code:'ABCDEFGH',round:1,settings:{},players:[{name:'A',lastSeen:0,seq:0,tugSeq:0},{name:'B',lastSeen:0,seq:0,tugSeq:0}],match:packMatch(server)};
-const client=Object.create(OnlineGame.prototype),view=new Commission(new KitePhysics());client.received=0;client.interval=1;client.latest=snapshot(room,0,0);client.render(view.player,view);
-for(const p of server.rival.rope.points)p.z-=.4;server.rival.position.z-=.4;room.match=packMatch(server);client.latest=snapshot(room,0,0);client.render(view.player,view);
+const client=Object.create(OnlineGame.prototype),view=new Commission(new KitePhysics());client.received=0;client.interval=100;client.latest=snapshot(room,0,0);client.render(view.player,view,0);
+for(const p of server.rival.rope.points)p.z-=.4;server.rival.position.z-=.4;room.match=packMatch(server);client.latest=snapshot(room,0,0);client.render(view.player,view,10);client.render(view.player,view,110);
 assert.ok(view.rival.rope.points[14].z>view.player.rope.points[14].z,'Visual interpolation retains strand order despite a crossing candidate');
 server.rival.rope.breakAt(12,.5);room.match=packMatch(server);client.latest=snapshot(room,0,0);client.render(view.player,view);assert.equal(view.rival.rope.broken,13);assert.ok(view.rival.rope.points[14].z<0,'A network fracture releases the rendered loose end');
 console.log('PASS: online render guard preserves strand order and releases after authoritative fracture.');

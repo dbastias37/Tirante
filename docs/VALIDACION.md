@@ -1,5 +1,26 @@
 # Validación de la exportación
 
+## Rendimiento y vuelo · versión 1.8.0 · 24 de octubre de 2026
+
+Validación local con Node.js 24.19.0:
+
+- `npm run build`: 43 módulos comprobados. `npm test`: todas las suites y las 9 pruebas de integración HTTP/SQLite aprobadas.
+- Se compararon los candidatos de colisión y su orden contra una búsqueda exhaustiva, con 50 escenas deterministas, 1–4 hilos, movimiento barrido, diferentes radios, fracturas y cambios de orden. En cuatro hilos largos separados se reducen las comprobaciones de límites de 6.216 a 600.
+- Siguen pasando los cruces rápidos, contactos tangentes, autoenredos, desgaste y fracturas; la prueba de Party inspecciona 827.631 pares de segmentos. La interpolación visual también conserva la separación y libera el hilo cuando el servidor confirma un corte.
+- Se verifica la continuidad de volantín, hilo y animación del papel al recibir un paquete antes de acabar la transición anterior, desde ambos asientos. Cambiar de sala o de ronda descarta la transición anterior.
+- Se inspeccionan los materiales y la geometría real de Three.js sin GPU: opacidad 0,4, transparencia en una pasada, paneles completos sin triángulos superpuestos, UV continuas, 112 vértices por vela y normales finitas. Las llamadas de dibujo de Canvas comprueban el 40 % en papel clásico, liso y estampado, sin acumular dos capas de opacidad.
+- El terreno mide 800 × 800 m, con 8.192 triángulos en vez de 20.000, y no contiene instancias de pasto ni flores. El radio de 150 m permanece plano; los árboles empiezan a 210 m, las montañas a 360 m y la niebla a 190 m. La distancia de cámara aumenta a 1.200 m.
+- Con la misma configuración de vuelo y soltando tras 8 segundos, la primera vuelta pasa de 2,1625 s a 2,0125 s. Las pruebas de vuelo estable, recuperación y picada siguen aprobadas. El recorrido original de contrarreloj se completa en 30,83 s con soltadas algo más cortas; sus puntos, radios y medallas no se alteraron.
+
+Microcomparación local contra `d97f928` (mediana de cinco ejecuciones de 1.800 actualizaciones; animación precalentada durante 300 actualizaciones):
+
+| Trabajo de CPU | Antes | 1.8.0 |
+| --- | ---: | ---: |
+| Animación de un volantín con cola | 136,13 ms | 78,63 ms |
+| Comprobación del movimiento de cuatro hilos largos separados | 79,50 ms | 26,49 ms |
+
+Son mediciones de funciones aisladas, no FPS del juego ni garantías para todos los dispositivos. La comprobación visual en el navegador disponible usa el renderer Canvas porque ese entorno no ofrece WebGL; no se ha medido rendimiento en una GPU real.
+
 ## Reparación de Render · 24 de octubre de 2026
 
 El despliegue original `Tirante` era un Static Site que publicaba la raíz del repositorio. Su HTML pedía `/app.js` y `/style.css`, que devolvían 404. Las API tampoco se ejecutaban. El build estaba correcto; el tipo de servicio y la entrada publicada no correspondían al servidor de esta exportación.

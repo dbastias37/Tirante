@@ -58,18 +58,33 @@ export class OnlineGame{
     $('online-return').classList.toggle('hidden',!playing);$('online-room-note').textContent=left?'Un jugador salió. Crea otra sala para un nuevo duelo.':d?.paused?'Esperando la reconexión. La física y el reloj están detenidos.':playing?'El duelo sigue mientras tengas el menú abierto.':'La partida comienza cuando ambos pulsen «Estoy listo».';
     $('online-room-rules').textContent=d?`${d.settings.capacity} m de hilo · ${(d.settings.wind*3.6).toFixed(1)} km/h · 90 segundos`:'';
   }
-  render(p,duel){
-    const d=this.latest;if(!d?.match)return;const m=d.match,old=this.from?.round===d.round?this.from.match:null,t=clamp((performance.now()-this.received)/this.interval,0,1),own=d.slot;
+  render(p,duel,now=performance.now()){
+    const d=this.latest;if(!d?.match)return;const m=d.match,own=d.slot,views=own?[duel.rival,p]:[p,duel.rival],fresh=this.visualSnapshot!==d;
+    if(fresh){
+      // Network intervals vary. Start the next transition at the positions
+      // actually on screen, not at a packet the renderer never reached.
+      const continuous=this.visualSnapshot?.code===d.code&&this.visualSnapshot?.round===d.round&&this.viewRound===d.round;
+      this.visualSource=continuous?{pilots:m.pilots.map((k,slot)=>{
+        const view=views[slot],body={};
+        for(const [key,value] of Object.entries(k.body)){
+          if(value?.vector){const vector=view[key]?.toArray?.()||[...value.vector];if(key==='anchor'||key==='position'){vector[0]+=this.visualOffset[0];vector[2]+=this.visualOffset[2];}body[key]={vector};}
+          else body[key]=view[key];
+        }
+        return {body,rope:{broken:view.rope.broken,points:view.rope.points.map(q=>[q.x+this.visualOffset[0],q.y,q.z+this.visualOffset[2]])}};
+      })}:null;
+      this.visualSnapshot=d;this.visualStarted=now;
+    }
+    const old=this.visualSource,t=old?clamp((now-this.visualStarted)/this.interval,0,1):1;
     const anchor=m.pilots[own].body.anchor.vector,prevAnchor=old?.pilots[own].body.anchor.vector||anchor;
     const offset=[prevAnchor[0]+(anchor[0]-prevAnchor[0])*t,0,prevAnchor[2]+(anchor[2]-prevAnchor[2])*t];
     for(const [view,slot] of [[p,own],[duel.rival,1-own]]){
-      const k=m.pilots[slot],a=old?.pilots[slot],previous=view.rope.points.map(p=>p.clone());view.networkControlled=true;
-      if(JSON.stringify(view.setup)!==JSON.stringify(k.setup))view.configure(k.setup);
+      const k=m.pilots[slot],source=old?.pilots[slot],a=source?.rope.broken===k.rope.broken?source:null,previous=view.rope.points.map(p=>p.clone());view.networkControlled=true;
+      if(fresh&&JSON.stringify(view.setup)!==JSON.stringify(k.setup))view.configure(k.setup);
       for(const [key,value] of Object.entries(k.body)){
         if(value?.vector){const arr=value.vector,prev=a?.body[key]?.vector||arr;
           if(key==='orientation'){view.orientation.fromArray(prev);view.orientation.slerp(view.orientation.clone().fromArray(arr),t);}
           else{const vals=arr.map((n,i)=>prev[i]+(n-prev[i])*t);if(['anchor','position'].includes(key)){vals[0]-=offset[0];vals[2]-=offset[2];}view[key]?.fromArray?.(vals);}
-        }else view[key]=value;
+        }else view[key]=a&&['time','bend'].includes(key)?a.body[key]+(value-a.body[key])*t:value;
       }
       const r=k.rope,canLerp=a&&a.rope.broken===r.broken&&a.rope.points.length===r.points.length;
       while(view.rope.points.length<r.points.length)view.rope.points.push(new Vector3());view.rope.points.length=r.points.length;
@@ -77,11 +92,11 @@ export class OnlineGame{
       view.rope.previous=this.viewRound===d.round&&previous.length===view.rope.points.length?previous:view.rope.points.map(p=>p.clone());
       for(const key of ['broken','breakAge','contactEdge','contactAge','contactLoad','integrity'])view.rope[key]=r[key];
       view.rope.contactPoint.fromArray(r.contactPoint).sub(new Vector3(offset[0],0,offset[2]));view.rope.breakPoint=r.breakPoint?new Vector3().fromArray(r.breakPoint).sub(new Vector3(offset[0],0,offset[2])):null;
-      view.rope.wear.fill(0);for(const [i,n] of r.wear)view.rope.wear[i]=n;
+      if(fresh){view.rope.wear.fill(0);for(const [i,n] of r.wear)view.rope.wear[i]=n;}
     }
     // Snapshot interpolation also obeys non-crossing, independently of the
     // authoritative 240 Hz solver. Camera smoothing cannot undo a collision.
-    guardRopeMotion([p.rope,duel.rival.rope]);this.viewRound=d.round;
+    guardRopeMotion([p.rope,duel.rival.rope]);this.viewRound=d.round;this.visualOffset=offset;
     for(const key of ['state','elapsed','remaining','contact','pressure','sliding','reversals','engagements'])duel[key]=m[key];
     duel.playerHealth=own?m.rivalHealth:m.playerHealth;duel.rivalHealth=own?m.playerHealth:m.rivalHealth;duel.contactPoint.fromArray(m.contactPoint).sub(new Vector3(offset[0],0,offset[2]));
     duel.lastHit=m.lastHit?(own?{i:m.lastHit.j,j:m.lastHit.i,s:m.lastHit.t,t:m.lastHit.s}:m.lastHit):null;

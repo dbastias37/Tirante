@@ -6,11 +6,11 @@ import {TrailView,drawCanvasTrail} from './trail-view.js';
 import {frameDuel,positionView,handViewOffset} from './duel-camera.js';
 import * as THREE from './vendor/three.module.js';
 import {clamp,mix,configuration} from './physics.js';
+import {PAPER_OPACITY,FIELD_SIZE,CAMERA_FAR,SKY_RADIUS,HORIZON_RADIUS,FOG_NEAR,FOG_FAR,renderPixelRatio,terrainHeight} from './render-settings.js';
 
 const PALETTE={terracotta:0xc96343,teal:0x397f80,saffron:0xd3a138,plum:0x92709b};
 const v3=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
 function mesh(geometry,color,roughness=1){return new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color,roughness}));}
-function terrainHeight(x,z){const distance=clamp((-z-12)/60,0,1);return distance*(Math.sin(x*.035+.4)*2.1+Math.sin(z*.035)*1.3+.6);}
 function seeded(seed){return()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};}
 
 export class PaperKite {
@@ -18,14 +18,17 @@ export class PaperKite {
     this.group=new THREE.Group();this.panels=[];this.materials=[];this.strings=[];this.knots=new THREE.Group();
     const corners=[v3(0,.4,0),v3(.4,0,0),v3(0,-.4,0),v3(-.4,0,0)];
     for(let sector=0;sector<4;sector++){
-      const a=corners[sector],b=corners[(sector+1)%4],vertices=[],n=9;
-      const point=(i,j)=>[a.x*i/n+b.x*j/n,a.y*i/n+b.y*j/n,0];
+      const a=corners[sector],b=corners[(sector+1)%4],vertices=[],indices=[],rows=[],n=6;
+      // Shared vertices keep the paper flexible without recalculating duplicate
+      // positions and normals for every triangle, every frame, on every kite.
+      for(let i=0;i<=n;i++){rows[i]=vertices.length/3;for(let j=0;j<=n-i;j++)vertices.push(a.x*i/n+b.x*j/n,a.y*i/n+b.y*j/n,0);}
+      const index=(i,j)=>rows[i]+j;
       for(let i=0;i<n;i++)for(let j=0;j<n-i;j++){
-        vertices.push(...point(i,j),...point(i+1,j),...point(i,j+1));
-        if(i+j<n-1)vertices.push(...point(i+1,j),...point(i+1,j+1),...point(i,j+1));
+        indices.push(index(i,j),index(i+1,j),index(i,j+1));
+        if(i+j<n-1)indices.push(index(i+1,j),index(i+1,j+1),index(i,j+1));
       }
-      const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(vertices.flatMap((v,i)=>i%3===0?[(v+.4)/.8,(vertices[i+1]+.4)/.8]:[]),2));geometry.computeVertexNormals();
-      const mat=new THREE.MeshStandardMaterial({color:sector%2?0xf8efd8:PALETTE.terracotta,side:THREE.DoubleSide,roughness:.91,metalness:0});
+      const geometry=new THREE.BufferGeometry();geometry.setIndex(indices);geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(vertices.flatMap((v,i)=>i%3===0?[(v+.4)/.8,(vertices[i+1]+.4)/.8]:[]),2));geometry.computeVertexNormals();
+      const mat=new THREE.MeshStandardMaterial({color:sector%2?0xf8efd8:PALETTE.terracotta,side:THREE.DoubleSide,roughness:.91,metalness:0,transparent:true,opacity:PAPER_OPACITY,depthWrite:false,forceSinglePass:true});
       const part=new THREE.Mesh(geometry,mat);part.castShadow=true;this.group.add(part);this.panels.push(part);this.materials.push(mat);
     }
     const lineMaterial=new THREE.LineBasicMaterial({color:0x94744f});
@@ -77,9 +80,9 @@ export class Landscape {
   constructor(canvas,physics){
     this.physics=physics;this.canvas=canvas;this.time=0;this.follow=true;this.zoom=false;this.orbit=new OrbitCamera();this.yaw=0;this.pitch=.1;this.width=1;this.height=1;
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.7));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.25;
-    this.scene=new THREE.Scene();this.scene.fog=new THREE.Fog(0xc2cfbe,65,205);
-    this.camera=new THREE.PerspectiveCamera(52,1,.05,350);this.camera.position.set(0,1.7,1.2);this.scene.add(this.camera);
+    this.renderer.setPixelRatio(renderPixelRatio(window.devicePixelRatio));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.25;
+    this.scene=new THREE.Scene();this.scene.fog=new THREE.Fog(0xc2cfbe,FOG_NEAR,FOG_FAR);
+    this.camera=new THREE.PerspectiveCamera(52,1,.05,CAMERA_FAR);this.camera.position.set(0,1.7,1.2);this.scene.add(this.camera);
     this.targetCamera=new THREE.PerspectiveCamera();this.scene.add(new THREE.HemisphereLight(0xd7edf3,0x777f46,2.2));
     const sun=new THREE.DirectionalLight(0xffe4b6,3.1);sun.position.set(-35,70,-45);this.scene.add(sun);
     const fill=new THREE.DirectionalLight(0xc1e5ee,.7);fill.position.set(10,8,6);this.scene.add(fill);
@@ -107,7 +110,7 @@ export class Landscape {
   }
   configureRivals(rivals){rivals.forEach((p,i)=>{const visual=this.rivalVisuals[i];if(visual){visual.kite.configure(p.setup);visual.torso.material.color.set(p.partyTint||'#397f80');}});}
   createSky(){
-    const skyGeo=new THREE.SphereGeometry(300,24,16);
+    const skyGeo=new THREE.SphereGeometry(SKY_RADIUS,24,16);
     const skyMat=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,uniforms:{top:{value:new THREE.Color(0x7bafc8)},bottom:{value:new THREE.Color(0xe6e6cd)}},vertexShader:'varying vec3 vPos; void main(){vPos=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'uniform vec3 top;uniform vec3 bottom;varying vec3 vPos;void main(){float h=clamp(normalize(vPos).y*1.7,0.0,1.0);gl_FragColor=vec4(mix(bottom,top,pow(h,.6)),1.0);}',fog:false});
     this.scene.add(new THREE.Mesh(skyGeo,skyMat));
     const sun=mesh(new THREE.SphereGeometry(3,20,16),0xfff5d1);sun.material=new THREE.MeshBasicMaterial({color:0xfff5d1});sun.position.set(-75,100,-150);this.scene.add(sun);
@@ -117,14 +120,14 @@ export class Landscape {
     for(let i=0;i<17;i++){const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,opacity:.65,depthWrite:false,fog:true,color:0xffffff}));sprite.position.set((rand()-.5)*250,28+rand()*40,-65-rand()*130);sprite.scale.set(30+rand()*38,13+rand()*12,1);sprite.userData.baseX=sprite.position.x;this.scene.add(sprite);this.clouds.push(sprite);}
   }
   createLandscape(){
-    const terrain=new THREE.PlaneGeometry(320,320,100,100);terrain.rotateX(-Math.PI/2);const pos=terrain.attributes.position;const colors=[];
-    const color=new THREE.Color(),c1=new THREE.Color(0x8b985e),c2=new THREE.Color(0xb0ab72);
+    const terrain=new THREE.PlaneGeometry(FIELD_SIZE,FIELD_SIZE,64,64);terrain.rotateX(-Math.PI/2);const pos=terrain.attributes.position;const colors=[];
+    const color=new THREE.Color(),c1=new THREE.Color(0x548447),c2=new THREE.Color(0x7fa354);
     for(let i=0;i<pos.count;i++){const x=pos.getX(i),z=pos.getZ(i);pos.setY(i,terrainHeight(x,z));const shade=(Math.sin(x*.13+z*.12)+Math.sin(x*.3-z*.09))*.15+.4;color.copy(c1).lerp(c2,shade);colors.push(color.r,color.g,color.b);}
     terrain.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));terrain.computeVertexNormals();this.scene.add(new THREE.Mesh(terrain,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1})));
-    const pathVertices=[];for(let i=0;i<100;i++){const z=8-i*1.3,z2=z-1.3;const x=3+Math.sin(-z*.045)*3,x2=3+Math.sin(-z2*.045)*3;const w=.7;for(const [a,b] of [[x-w,z],[x+w,z],[x2+w,z2],[x-w,z],[x2+w,z2],[x2-w,z2]])pathVertices.push(a,terrainHeight(a,b)+.025,b);}
+    const pathVertices=[];for(let i=0;i<100;i++){const z=8-i*3.6,z2=z-3.6;const x=3+Math.sin(-z*.045)*3,x2=3+Math.sin(-z2*.045)*3;const w=.7;for(const [a,b] of [[x-w,z],[x+w,z],[x2+w,z2],[x-w,z],[x2+w,z2],[x2-w,z2]])pathVertices.push(a,terrainHeight(a,b)+.025,b);}
     const pathGeo=new THREE.BufferGeometry();pathGeo.setAttribute('position',new THREE.Float32BufferAttribute(pathVertices,3));pathGeo.computeVertexNormals();this.scene.add(new THREE.Mesh(pathGeo,new THREE.MeshStandardMaterial({color:0xc3b890,roughness:1,side:THREE.DoubleSide})));
-    this.createMountains();this.createGrass();
-    const rand=seeded(81);for(let i=0;i<24;i++){const x=(rand()-.5)*150,z=-38-rand()*100;if(Math.abs(x)<9)continue;this.createTree(x,z,2.5+rand()*4);}
+    this.createMountains();
+    const rand=seeded(81);for(let i=0;i<18;i++){const angle=i/18*Math.PI*2+(rand()-.5)*.12,radius=210+rand()*80;this.createTree(Math.sin(angle)*radius,Math.cos(angle)*radius,4+rand()*5);}
     // A simple wind ribbon on a field post gives a second, diegetic wind cue.
     const post=mesh(new THREE.CylinderGeometry(.035,.045,2.7,6),0x897855);post.position.set(-5.6,1.35,-9);this.scene.add(post);
     this.ribbon=new THREE.Mesh(new THREE.PlaneGeometry(.17,1.25,1,12),new THREE.MeshStandardMaterial({color:0xc58a53,side:THREE.DoubleSide,roughness:1}));this.ribbon.geometry.translate(0,-.625,0);this.ribbon.position.set(-5.6,2.66,-9);this.scene.add(this.ribbon);
@@ -132,19 +135,11 @@ export class Landscape {
   }
   createMountains(){
     const rand=seeded(133);for(let layer=0;layer<3;layer++){
-      const vertices=[],z=-190+layer*27,base=-3;let previous=8;
-      for(let i=0;i<22;i++){const x=-180+i*17,next=8+rand()*16+(layer===0?10:0);vertices.push(x,base,z,x,previous,z,x+17,next,z,x,base,z,x+17,next,z,x+17,base,z);previous=next;}
+      const vertices=[],radius=HORIZON_RADIUS+(2-layer)*65,base=-5;
+      const peaks=Array.from({length:48},()=>16+rand()*28+(layer===0?20:0));
+      for(let i=0;i<48;i++){const a=i/48*Math.PI*2,b=(i+1)/48*Math.PI*2,x=Math.sin(a)*radius,z=Math.cos(a)*radius,x2=Math.sin(b)*radius,z2=Math.cos(b)*radius;vertices.push(x,base,z,x,peaks[i],z,x2,peaks[(i+1)%48],z2,x,base,z,x2,peaks[(i+1)%48],z2,x2,base,z2);}
       const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.computeVertexNormals();this.scene.add(new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:[0xadbeb4,0x97b0a2,0x809b8b][layer],side:THREE.DoubleSide,fog:true})));
     }
-  }
-  createGrass(){
-    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute([-.04,0,0,.04,0,0,.01,.55,.02,0,0,-.04,0,0,.04,.03,.4,.02],3));geo.computeVertexNormals();
-    const mat=new THREE.MeshStandardMaterial({color:0x90995b,roughness:1,side:THREE.DoubleSide,vertexColors:false});
-    this.grassUniform={value:0};mat.onBeforeCompile=shader=>{shader.uniforms.uTime=this.grassUniform;shader.vertexShader='uniform float uTime;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n transformed.x += sin(uTime * 1.8 + instanceMatrix[3].x * .7 + instanceMatrix[3].z * .3) * position.y * .15; transformed.z += cos(uTime * 1.3 + instanceMatrix[3].z * .6) * position.y * .08;');};
-    const grass=new THREE.InstancedMesh(geo,mat,4500);const rand=seeded(913),dummy=new THREE.Object3D(),c=new THREE.Color();
-    for(let i=0;i<4500;i++){let x=(rand()-.5)*85,z=7-rand()*90;const pathX=3+Math.sin(-z*.045)*3;if(Math.abs(x-pathX)<.9)x+=1.9;dummy.position.set(x,terrainHeight(x,z),z);dummy.rotation.y=rand()*Math.PI;dummy.scale.setScalar(.35+rand()*1.4);dummy.updateMatrix();grass.setMatrixAt(i,dummy.matrix);c.setHex([0x879753,0xa9a56a,0x7e8d54,0xb5ad77][Math.floor(rand()*4)]);grass.setColorAt(i,c);}this.scene.add(grass);
-    const flowers=new THREE.InstancedMesh(new THREE.SphereGeometry(.035,5,4),new THREE.MeshStandardMaterial({color:0xe0cf9b,roughness:1}),220);
-    for(let i=0;i<220;i++){const x=(rand()-.5)*30,z=2-rand()*26;dummy.position.set(x,terrainHeight(x,z)+.25+rand()*.2,z);dummy.scale.setScalar(.6+rand());dummy.updateMatrix();flowers.setMatrixAt(i,dummy.matrix);}this.scene.add(flowers);
   }
   createTree(x,z,height){
     const tree=new THREE.Group(),trunk=mesh(new THREE.CylinderGeometry(.05,.11,height*.65,5),0x6e6c4d);trunk.position.y=height*.32;tree.add(trunk);
@@ -183,7 +178,7 @@ export class Landscape {
   }
   render(dt,mode,paused){
     const p=this.physics,intro=mode==='intro',inDuel=!intro&&!!this.duel?.visible;const orbital=!intro&&this.orbit.active;if(!orbital)positionView(this.camera,inDuel,dt,this.duel?.partyMode?this.duel.npcCount:1);const orbitFrame=orbital?this.orbit.frame(this.camera,p.position,dt):null,duelFrame=inDuel&&!orbital?frameDuel(this.camera,this.duel):null;this.time=p.time;
-    this.grassUniform.value=p.time*(p.profile==='calm'?.05:.45+p.windSpeed*.12);
+    if(this.inDuel!==inDuel){this.inDuel=inDuel;this.renderer.setPixelRatio(renderPixelRatio(window.devicePixelRatio,inDuel));}
     for(const cloud of this.clouds)cloud.position.x=cloud.userData.baseX+Math.sin(p.time*.008)*9;
     if(intro){this.kite.group.position.set((this.width<760?1.7:4.3)+Math.sin(p.time*.47)*.25,p.profile==='calm'?.5:(this.width<760?7.4:6.1)+Math.sin(p.time*.7)*.2,-14);this.kite.group.rotation.set(-.38,.1,Math.sin(p.time*.66)*.08-.13);this.kite.group.scale.setScalar(1.45);}
     else{this.kite.group.position.copy(p.position);this.kite.group.quaternion.copy(p.orientation);this.kite.group.scale.setScalar(1);if(p.state==='ready'||p.state==='grounded'){this.kite.group.rotation.set(-.3,0,.17);}}

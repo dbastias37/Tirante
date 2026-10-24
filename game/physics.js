@@ -8,6 +8,7 @@ export const mix=(a,b,t)=>a+(b-a)*t;
 export const LINE_BOOST=2.5;
 export const DOUBLE_TUG_GAP=.22;
 export const LINE_CAPACITIES=[30,65,100,150];
+export const TURN_RESPONSE=1.1;
 export function configuration(s=DEFAULT_SETUP) {
   const left=s.left-s.knotsLeft*.8, right=s.right-s.knotsRight*.8, lower=s.lower-s.knotsLower*.8;
   const mounts=mountSettings(s),lengthBias=clamp((left-right)/8,-1,1);
@@ -116,11 +117,11 @@ export class KitePhysics {
     const disturbance=this.profile==='gusts'?.19:.025;
     const turnTorque=this.trim.bias*(1.4+taut*2.7)+disturbance*Math.sin(this.time*1.37);
     const selfRight=(this.setup.tail?3.8:1.15)*this.trim.stability;
-    const drive=this.trim.turnScale*freedom*this.spinSign*(this.setup.tail?3.8:5.1)*clamp(this.wind.length()/3.5,0,1.7);
+    const drive=TURN_RESPONSE*this.trim.turnScale*freedom*this.spinSign*(this.setup.tail?3.8:5.1)*clamp(this.wind.length()/3.5,0,1.7);
     const restoring=selfRight*Math.sin(this.heading)*(1-freedom)*taut*(catching?.025:1);
     const damping=((1-freedom)*(catching?9:4.8)+freedom*(this.setup.tail?.65:.45))*this.trim.dampingScale;
     const angularAcceleration=drive+turnTorque-restoring-this.spin*damping;
-    this.spin=clamp(this.spin+angularAcceleration*dt,-7.5,7.5);
+    this.spin=clamp(this.spin+angularAcceleration*dt,-8.5,8.5);
     const rotation=this.spin*dt;this.heading+=rotation;this.turnProgress+=rotation;
     if(Math.abs(this.turnProgress)>=Math.PI*2){this.turns++;this.turnProgress-=Math.sign(this.turnProgress)*Math.PI*2;}
     if(this.heading>Math.PI*2)this.heading-=Math.PI*2;
