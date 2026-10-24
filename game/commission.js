@@ -1,4 +1,5 @@
 import {solveRopeSystem} from './rope-system.js';
+import {mixSeed} from './line-stress.js';
 import {Vector3} from './vendor/three.module.js';
 import {KitePhysics,DEFAULT_SETUP,clamp} from './physics.js';
 const v=()=>new Vector3();
@@ -12,7 +13,7 @@ export function lineContact(player,rival){
 }
 export class Commission {
   constructor(player){
-    this.player=player;this.rival=new KitePhysics({...DEFAULT_SETUP,color:'teal',knotsLeft:1});this.rival.anchor.set(3.2,1.35,0);this.rival.reset();
+    this.player=player;this.rival=new KitePhysics({...DEFAULT_SETUP,color:'teal',knotsLeft:1},{seed:mixSeed(player.flightSeed^1)});this.rival.anchor.set(3.2,1.35,0);this.rival.reset();
     this.state='idle';this.elapsed=0;this.remaining=90;this.playerHealth=100;this.rivalHealth=100;this.contact=false;this.contactPoint=v();this.contactTime=0;this.engagements=0;this.lastPlayerPull=0;this.lastRivalPull=0;this.result=null;this.aiWait=0;this.attackAt=4;this.message='Acércate al hilo azul.';this.difficulty='normal';this.playerStroke=new SawStroke();this.rivalStroke=new SawStroke();this.pressure=0;this.sliding=0;this.reversals=0;this.lastHit=null;
   }
   get active(){return this.state==='preparing'||this.state==='playing';}
@@ -70,8 +71,10 @@ export class Commission {
       if(this.elapsed>=3){this.state='playing';this.elapsed=0;this.message='Cruza el hilo azul.';}return;
     }
     this.elapsed+=dt;this.remaining=Math.max(0,90-this.elapsed);this.controlRival(dt);b.step(dt);const physical=solveRopeSystem([p.rope,b.rope],dt)[0];
+    this.playerHealth=p.rope.integrity;this.rivalHealth=b.rope.integrity;
     if(p.state!=='flying'||b.state!=='flying'){
-      this.finish(p.state===b.state?'draw':p.state==='flying'?'win':'loss',p.state===b.state?'Ambos volantines tocaron tierra.':p.state==='flying'?'El rival tocó tierra.':'Tu volantín tocó tierra.');return;
+      const outP=p.state!=='flying',outB=b.state!=='flying',cut=p.rope.broken>=0||b.rope.broken>=0,loser=outP?p:b,why=loser.rope.cutReason==='wind'?'por una ráfaga extrema':loser.rope.cutReason==='tension'?'por exceso de tensión en el cruce':'';
+      this.finish(outP&&outB?'draw':outB?'win':'loss',outP&&outB?'Ambos volantines quedaron fuera.':cut?`${outP?'Tu hilo se cortó':'Se cortó el hilo del rival'}${why?' '+why:''}.`:outB?'El rival tocó tierra.':'Tu volantín tocó tierra.');return;
     }
     const hit=physical?.hit;this.contact=!!hit;this.sliding=0;this.pressure=0;
     if(hit){
@@ -93,7 +96,7 @@ export class Commission {
         b.rope.abrade(hit.j,hit.t,work*(.2+.8*(total?pa/total:0)));
       }
       this.playerHealth=p.rope.integrity;this.rivalHealth=b.rope.integrity;
-      this.message=contact.load<.04?'Contacto flojo · recoge para cargar el cruce.':this.sliding<.03?'Hilos trabados · alterna Q / E o mantén F para aserruchar.':'Aserruchando · el roce desgasta el punto de contacto.';
+      this.message=p.rope.stressRatio>.8?'Tu hilo está al límite · mantén Q para descargar.':contact.load<.04?'Cruce flojo · recoge suavemente antes de atacar.':'Tensa y da un tirón para cargar el cruce; el hilo más exigido puede cortarse, incluso el tuyo.';
     }else{
       if(this.elapsed-this.playerStroke.lastReversal>1){this.playerStroke.direction=0;this.playerStroke.travel=0;}
       if(this.elapsed-this.rivalStroke.lastReversal>1){this.rivalStroke.direction=0;this.rivalStroke.travel=0;}

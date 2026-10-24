@@ -1,5 +1,20 @@
 # Validación de la exportación
 
+## Cruces, tensión y ráfagas · versión 1.9.0 · 24 de octubre de 2026
+
+Validación local con Node.js 24.19.0:
+
+- `npm run build`: 47 módulos. `npm test`: todas las suites y las 9 pruebas de integración HTTP/SQLite aprobadas.
+- Regresiones que verifican que un cruce no detenga un hilo distante y que un cruce iniciado a 1 mm entre al cálculo de contacto y carga. Se conservan las pruebas de separación continua y los 827.631 pares de segmentos de Party.
+- Dos reproducciones con Party de cuatro volantines, carrete de 150 m, viento de 9 y 12 m/s, fases de viento de 60 y 15 s y alternancia brusca de soltar/recoger con boost. En 1.8 llegaban al límite de ronda de 120 s con bloqueos repetidos; ahora terminan en 6,36 y 5,93 s desde la preparación. El intervalo continuo de inmovilidad con bloqueo superior al 99 % es 0 s en ambas. Se desactiva la ráfaga extraordinaria en esta prueba para aislar el arreglo de contacto.
+- Un cruce cerca del límite permanece intacto sin tirón y fractura el material más gastado al tirar. Intercambiar el hilo gastado intercambia al perdedor; no favorece al jugador. Se prueban empates, autoenredos, ausencia de daño a distancia, recuperación de picos, punto exacto de corte y retroceso de los extremos.
+- Un enredo controlado con desplazamiento rechazado se libera por fractura en 1,09 s. El mismo caso soltando hilo no se corta. Duplicar doce veces los contactos no multiplica la exposición.
+- `npm run test:wind`: 1.000 vuelos de hasta 40 s, perfil firme, base de 9 m/s, configuración inicial y sin maniobras. 113 recibieron la ráfaga y se cortaron (11,3 %); los otros 887 no se cortaron. Una muestra separada de 10.000 semillas seleccionó 1.037 ráfagas (10,37 %). Son muestras deterministas reproducibles, no una tasa garantizada para cualquier forma de jugar.
+- Con la misma semilla de ráfaga, soltar rápido con boost conserva la hebra que se corta al mantenerla tensa. Esa defensa no garantiza seguir en el aire: el giro todavía puede llevar el volantín al suelo.
+- El estado de sobrecarga y el resultado permanecen iguales tras guardar/restaurar la simulación; ambos asientos reciben la misma carga y causa del corte. Se mantienen las pruebas de reconexión y continuidad visual online.
+
+Repetir: `npm run build && npm test`, y `npm run test:wind` para la muestra extensa de viento. La comprobación en navegador y despliegue se registra después de publicar esta versión.
+
 ## Rendimiento y vuelo · versión 1.8.0 · 24 de octubre de 2026
 
 Validación local con Node.js 24.19.0:

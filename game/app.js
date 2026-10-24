@@ -22,7 +22,7 @@ if(Number.isFinite(saved.setup?.mass))setup.mass=clamp(saved.setup.mass,22,70);
 if(typeof saved.setup?.tail==='boolean')setup.tail=saved.setup.tail;
 Object.assign(setup,appearance(saved.setup));
 const savedMounts=mountSettings(saved.setup);setup.anchorLeft=savedMounts.left;setup.anchorRight=savedMounts.right;
-const physics=new KitePhysics(setup);
+const physics=new KitePhysics(setup,{seed:crypto.getRandomValues(new Uint32Array(1))[0]});
 if([30,65,100,150].includes(saved.lineCapacity))physics.setLineCapacity(saved.lineCapacity);
 let partyCount=[1,2,3].includes(saved.partyCount)?saved.partyCount:3;
 const duel=new PartyCommission(physics),duelStats={wins:0,losses:0,draws:0};
@@ -141,8 +141,9 @@ function updateUI(){
   document.querySelector('.control-caption>span').textContent=online?.active?'W A S D · Pasos cortos para alinear el cruce':landscape.orbit.active?'Arrastra para orbitar · Rueda para acercar · V cambia la cámara':trail.visible?'Q / E para seguir la luz · V cámara orbital':'Arrastra para mirar · V cámara orbital · R para volver a lanzar';
   $('intro-wind').textContent=Math.round(wind);const weather=$('intro-weather').querySelector('p');weather.innerHTML=physics.profile==='calm'?'Todo en calma<span>Hoy hace falta una brisa</span>':physics.profile==='gusts'?'Entre ráfagas<span>El viento cambia de intensidad</span>':physics.profile==='strong'?'Viento firme<span>Más fuerza en el hilo</span>':'Brisa de tarde<span>Buen momento para empezar</span>';
   $('wind-value').textContent=wind.toFixed(1);$('wind-profile-label').textContent={breeze:'BRISA',gusts:'RÁFAGAS',strong:'FIRME',calm:'CALMA'}[p.profile];
-  $('height-value').textContent=Math.max(0,p.position.y).toFixed(1);$('line-value').textContent=p.lineLength.toFixed(1);$('tension-fill').style.width=clamp(p.tension/8*100,0,100)+'%';
-  const tensionColor=p.tension<.1?'#bb9450':p.tension>7?'#b96a45':'#5b826b';$('tension-fill').style.background=tensionColor;$('tension-label').style.color=tensionColor;$('tension-label').textContent=p.tension<.1?'Suelto':p.tension<2?'Suave':p.tension<7?'Tenso':'Firme';
+  const strain=p.rope.broken>=0?0:Math.max(0,p.rope.stressRatio||p.tension/(p.rope.strength||90)),strainPercent=Math.round(strain*100);
+  $('height-value').textContent=Math.max(0,p.position.y).toFixed(1);$('line-value').textContent=p.lineLength.toFixed(1);$('tension-fill').style.width=clamp(strainPercent,0,100)+'%';
+  const tensionColor=strain>=.8?'#b94f37':strain>=.6?'#b78b3e':p.tension<.1?'#bb9450':'#5b826b';$('tension-fill').style.background=tensionColor;$('tension-label').style.color=tensionColor;$('tension-label').textContent=strain>=1?`AL LÍMITE · ${strainPercent}%`:strain>=.8?`Alta · ${strainPercent}%`:strain<.01?'Suelto':`${strainPercent}% del límite`;
   const secs=Math.floor(p.flightTime);$('flight-timer').textContent=String(Math.floor(secs/60)).padStart(2,'0')+':'+String(secs%60).padStart(2,'0');
   $('turns-value').textContent=p.turns;
   $('line-capacity').value=p.lineCapacity;$('line-capacity').disabled=duel.active||trail.visible||!!online?.active;
@@ -160,7 +161,7 @@ function updateUI(){
   }
   if(!online?.active){$('rival-name').textContent='Mateo · NPC';$('rival-marker').querySelector('span').textContent='MATEO · NPC';$('result-rival-name').textContent='Mateo';}
   if(duel.visible){const sec=Math.ceil(duel.remaining);$('duel-timer').textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');$('duel-state').textContent={preparing:'PREPARACIÓN',playing:duel.contact?'EN CONTACTO':'EN JUEGO',finished:'TERMINADA'}[duel.state];$('duel-hint').textContent=duel.message;$('duel-hud').classList.toggle('in-contact',duel.contact);for(const [id,val] of [['player',duel.playerHealth],['rival',duel.rivalHealth]]){$(id+'-integrity').textContent=Math.ceil(val)+'%';$(id+'-integrity-fill').style.width=val+'%';}}
-  $('contact-load').textContent=duel.contact?`${duel.pressure.toFixed(1)} N · ${duel.reversals} pasadas`:duel.state==='finished'?'TERMINADO':'SIN CONTACTO';
+  $('contact-load').textContent=duel.contact?`Carga ${strainPercent}% · ${duel.reversals} pasadas`:duel.state==='finished'?'TERMINADO':'SIN CONTACTO';
   updateControlState();
   const pulseAge=p.time-p.lastTug,tugRecent=p.state==='flying'&&pulseAge<.65;
   $('tug-button').classList.toggle('pressed',p.state==='flying'&&pulseAge<.18);
@@ -173,10 +174,11 @@ function updateUI(){
     else if(wind>23)setStatus('El viento viene con fuerza.','Lanza con cuidado y suelta hilo poco a poco.','#bb794e');
     else setStatus('El viento está a favor.','Da el primer tirón y mira hacia arriba.');
   }else if(p.state==='grounded')setStatus('De vuelta en la tierra.','Cada intento enseña algo. Ajusta el viento o vuelve a lanzar.','#b18b54');
-  else if(p.state==='cut')setStatus('El hilo se cortó.','El volantín sigue al viento.','#b18b54');
+  else if(p.state==='cut')setStatus(p.rope.cutReason==='wind'?'La ráfaga superó el límite del hilo.':p.rope.cutReason==='tension'?'El hilo cedió por tensión.':'El hilo se cortó.','Los dos extremos quedaron libres y el volantín sigue al viento.','#b18b54');
   else if(duel.state==='preparing')setStatus(duel.message,'Los volantines están tomando altura.');
+  else if(strain>=.8)setStatus(strain>=1?'¡Hilo al límite!':`Tensión alta · ${strainPercent}% del límite.`,'Mantén Q para descargar; Shift acelera. Otro tirón puede cortar tu hilo.','#b94f37');
   else if(p.exhausted)setStatus('Toma un respiro.','Recupera un 20% de energía para volver a usar boost.','#b18b54');
-  else if(duel.contact)setStatus('Siente el contacto del hilo.','Alterna Q / E o mantén F para aserruchar. Shift acelera las pasadas.','#b18b54');
+  else if(duel.contact)setStatus('El cruce transmite la tensión.','Tensa con E y da un tirón: cede el hilo más exigido. Q descarga; F desgasta.','#b18b54');
   else if(p.profile==='calm'||wind<5.5)setStatus('El viento se apagó.','Sin brisa perderá altura. Puedes cambiar el viento.','#b18b54');
   else if(tugRecent)setStatus(p.tugSequence===2?`Doble tirón · ${p.tugIndex} de 2.`:'Tirón en la dirección de la nariz.',Math.cos(p.heading)<-.2?'Apunta abajo: el tirón acompaña la picada.':'La tensión frena el giro y sostiene el rumbo que elegiste.');
   else if(p.action==='reel'&&Math.cos(p.heading)<-.2)setStatus(p.boost?'Recogiendo en picada · boost.':'Recogiendo hacia abajo.','La nariz manda. Suelta hilo para volver a dejarlo girar.','#b18b54');
@@ -185,7 +187,7 @@ function updateUI(){
   else if(p.slack>.15&&p.tension<.1)setStatus('El hilo quedó flojo.','Recoge para recuperar respuesta; Shift acelera la recogida.','#b18b54');
   else if(Math.cos(p.heading)<-.2)setStatus('La nariz apunta hacia abajo.','Recoge para entrar en picada o suelta para seguir girando.','#b18b54');
   else if(p.position.y<2.7&&p.velocity.y<-.25)setStatus('Está cerca del suelo.','Para remontar, deja que apunte arriba antes de tensar.','#b18b54');
-  else if(p.tension>7)setStatus('El hilo está muy cargado.','Suelta un poco para aliviar la fuerza.','#b96a45');
+  else if(strain>.6)setStatus('El hilo está cargado.','Tienes menos margen para un tirón. Mantén Q para bajar la tensión.','#b96a45');
   else if(p.action==='reel')setStatus(p.boost?'Recogiendo hilo · velocidad ×2,5.':'Siente cómo responde el hilo.','Recoger acerca el volantín y mantiene la dirección de su nariz.');
   else if(Math.abs(p.velocity.y)>.5)setStatus(p.velocity.y>0?'Está encontrando su altura.':'El vuelo cambia de ritmo.','Mantén el hilo y observa. El viento también hace su parte.');
   else setStatus('Encontraste el equilibrio.','Suelta un poco para explorar más cielo, o disfruta el momento.');

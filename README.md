@@ -1,6 +1,6 @@
 # TIRANTE · El pulso del viento
 
-Proyecto completo, versión 1.8.0, preparado para un repositorio nuevo en GitHub y un Web Service en Render.
+Proyecto completo, versión 1.9.0, preparado para un repositorio nuevo en GitHub y un Web Service en Render.
 
 ## Instalación actual en Render
 
@@ -22,6 +22,14 @@ La instalación actual usa el plan gratuito, una instancia y `DATA_DIR=/tmp/tira
 - Party local contra 1–3 NPC, Rastro de luz contrarreloj y duelo online para dos personas.
 - Interfaz compacta para móvil, renderer WebGL y alternativa Canvas.
 - Servidor Node.js, base SQLite, almacenamiento de estampados y pruebas automatizadas.
+
+## Cambios de la versión 1.9.0
+
+- Corregidos los cruces bruscos que frenaban el movimiento sin registrar contacto ni carga. Un cruce tampoco detiene a los volantines alejados.
+- La carga del cruce y los tirones se comparan con la resistencia restante de cada hilo. El más exigido puede ceder, incluido el del jugador que ataca; el desgaste reduce su margen.
+- Los enredos acumulan carga por el movimiento que intentas hacer. Soltar hilo la reduce; forzar un cruce puede fracturar una hebra y liberar sus extremos.
+- Una ráfaga extrema se selecciona con probabilidad del 10 % por vuelo con viento fuerte. El corte depende de la carga sostenida y de cómo controles el hilo. No se sortea un corte por fotograma.
+- La barra muestra el porcentaje del límite y avisa de la sobrecarga. E recoge, Espacio tira y Q descarga; Shift acelera. Las mismas reglas se ejecutan en el servidor del duelo online.
 
 ## Cambios de la versión 1.8.0
 

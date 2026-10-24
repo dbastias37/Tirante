@@ -1,6 +1,7 @@
 import {Vector3} from './vendor/three.module.js';
 import {closestSegments,CONTACT_RADIUS} from './rope.js';
 import {visitRopePairs as pairs} from './rope-broadphase.js';
+import {resolveLineStress} from './line-stress.js';
 const GAP=CONTACT_RADIUS*2,SKIN=GAP*1.25,GUARD=GAP*.25;
 const v=()=>new Vector3();
 // Conservative advancement: the distance between two deforming segments is
@@ -32,7 +33,7 @@ function gather(ropes,swept=true){
   pairs(ropes,swept,SKIN,(a,b)=>{
     const ap=a.r.points,bp=b.r.points,old=closestSegments(a.r.previous[a.i],a.r.previous[a.i+1],b.r.previous[b.i],b.r.previous[b.i+1]);
     let hit=closestSegments(ap[a.i],ap[a.i+1],bp[b.i],bp[b.i+1]),toi=null;
-    if(swept&&old.distance>GAP+1e-7)toi=segmentTOI(a.r.previous[a.i],a.r.previous[a.i+1],b.r.previous[b.i],b.r.previous[b.i+1],ap[a.i],ap[a.i+1],bp[b.i],bp[b.i+1],GAP);
+    if(swept&&old.distance>1e-10)toi=segmentTOI(a.r.previous[a.i],a.r.previous[a.i+1],b.r.previous[b.i],b.r.previous[b.i+1],ap[a.i],ap[a.i+1],bp[b.i],bp[b.i+1],old.distance>GAP?GAP:Math.min(GUARD,old.distance*.5));
     if(!toi&&hit.distance>SKIN)return;
     if(toi)hit=toi;
     const normal=normalFor(a,b,hit,toi?hit:old);
@@ -54,10 +55,15 @@ function project(c,friction=false){
 // Final acceptance guard is applied after every length/contact correction.
 // It also includes endpoints, the hand-side edges and self contacts. If an
 // unresolved tangle blocks motion, it remains blocked until it slides free or
-// abrasion fractures a strand. We do not reset/teleport the rope to untangle it.
-export function guardRopeMotion(ropes){
-  let fraction=1;
+// abrasion or excess tension fractures a strand. No rope reset or teleport.
+export function guardRopeMotion(ropes,blockedContacts=null){
+  // A collision must not stop an unrelated kite. Connect ALL overlapping swept
+  // bounds, not only actual hits: independently shortened trajectories then
+  // cannot create a new collision between disconnected components.
+  const parent=ropes.map((_,i)=>i),limits=ropes.map(()=>1),root=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
+  for(const r of ropes){r._blockedMotion=0;r._blockedTravel=0;}
   pairs(ropes,true,GUARD,(a,b)=>{
+    const ra=root(a.ri),rb=root(b.ri);if(ra!==rb){parent[rb]=ra;limits[ra]=Math.min(limits[ra],limits[rb]);}
     const ap=a.r.previous,bp=b.r.previous,aq=a.r.points,bq=b.r.points;
     const initial=closestSegments(ap[a.i],ap[a.i+1],bp[b.i],bp[b.i+1]);
     // A too-close starting pair still retains its side. Only an exactly
@@ -65,10 +71,14 @@ export function guardRopeMotion(ropes){
     if(initial.distance<1e-10)return;
     const radius=Math.min(GUARD,initial.distance*.5);
     const h=segmentTOI(ap[a.i],ap[a.i+1],bp[b.i],bp[b.i+1],aq[a.i],aq[a.i+1],bq[b.i],bq[b.i+1],radius);
-    if(h)fraction=Math.min(fraction,h.time*.9);
+    if(h){limits[root(a.ri)]=Math.min(limits[root(a.ri)],h.time*.9);if(blockedContacts)blockedContacts.push({a:a.ri,b:b.ri,ra:a.r,rb:b.r,i:a.i,j:b.i,s:h.s,t:h.t,normal:normalFor(a,b,h,h),swept:true,correction:0});}
   });
-  if(fraction<1)for(const r of ropes){if(r.broken>=0)continue;const end=r.points.at(-1).clone();for(let i=0;i<r.points.length;i++)r.points[i].copy(r.previous[i].clone().lerp(r.points[i],fraction));r.owner.anchor.copy(r.points[0]);r.owner.position.add(r.points.at(-1).clone().sub(end));r.owner.velocity?.multiplyScalar(fraction);r._blockedMotion=1-fraction;}
-  return fraction;
+  let minimum=1;
+  for(let k=0;k<ropes.length;k++){const r=ropes[k],fraction=limits[root(k)];if(r.broken>=0)continue;minimum=Math.min(minimum,fraction);if(fraction>=1)continue;
+    const end=r.points.at(-1).clone();r._blockedTravel=end.distanceTo(r.previous.at(-1))*(1-fraction);
+    for(let i=0;i<r.points.length;i++)r.points[i].copy(r.previous[i].clone().lerp(r.points[i],fraction));r.owner.anchor.copy(r.points[0]);r.owner.position.add(r.points.at(-1).clone().sub(end));r.owner.velocity?.multiplyScalar(fraction);r._blockedMotion=1-fraction;
+  }
+  return minimum;
 }
 export function solveRopeSystem(ropes,dt){
   const intact=ropes.filter(r=>r.broken<0);if(!intact.length)return [];
@@ -81,7 +91,11 @@ export function solveRopeSystem(ropes,dt){
       if(pass===2){const extra=gather(ropes);const keys=new Set(contacts.map(c=>`${c.a}:${c.i}:${c.b}:${c.j}`));for(const c of extra)if(!keys.has(`${c.a}:${c.i}:${c.b}:${c.j}`)){contacts.push(c);all.push(c);}}
     }
   }
-  const accepted=guardRopeMotion(ropes),byPair=new Map(),strongest=new Map();
+  // Even a contact introduced by the last length correction must enter the
+  // load/stress model. Previously the guard could block it while reporting no
+  // contact, zero pressure and no possible way to wear or release the strand.
+  const blocked=[],accepted=guardRopeMotion(ropes,blocked),byPair=new Map(),strongest=new Map();
+  const keys=new Set(all.map(c=>`${c.a}:${c.i}:${c.b}:${c.j}`));for(const c of blocked)if(!keys.has(`${c.a}:${c.i}:${c.b}:${c.j}`))all.push(c);
   // Aggregate geometric contacts per strand pair. Multiple vertices must not
   // multiply the same physical feed travel into artificial damage.
   for(const h of all){
@@ -94,6 +108,7 @@ export function solveRopeSystem(ropes,dt){
     for(const [r,edge] of [[a,h.i],[b,h.j]])if(!strongest.has(r)||strongest.get(r).load<load)strongest.set(r,{point,load,edge});
   }
   for(const [r,c]of strongest){r.contactEdge=c.edge;r.contactPoint.copy(c.point);r.contactLoad=c.load;r.contactAge=0;}
-  for(const r of intact)r.commitVelocities();
+  resolveLineStress(ropes,all,dt);
+  for(const r of intact)if(r.broken<0)r.commitVelocities();
   return [...byPair.values()];
 }

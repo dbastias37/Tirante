@@ -1,5 +1,6 @@
 import {mountSettings} from './kite-shape.js';
 import {Tether} from './rope.js';
+import {flightGust,extremeGust,updateWindStress} from './line-stress.js';
 import { Vector3, Quaternion, Matrix4 } from './vendor/three.module.js';
 
 export const DEFAULT_SETUP = Object.freeze({left:44, right:44, lower:52, knotsLeft:0, knotsRight:0, knotsLower:0, mass:34, tail:true, color:'terracotta', anchorLeft:55, anchorRight:55, sailStyle:'classic', paperColor:null, printId:'', imageFit:'cover', imageScale:1});
@@ -23,12 +24,13 @@ export function configuration(s=DEFAULT_SETUP) {
 // unilateral elastic tether, apparent wind, and tension-dependent spin.
 // Coefficients are tunable estimates, not measurements of a particular kite.
 export class KitePhysics {
-  constructor(setup={...DEFAULT_SETUP}) {
+  constructor(setup={...DEFAULT_SETUP},{seed=0x51f15e}={}) {
     this.setup={...setup}; this.trim=configuration(this.setup);
     this.anchor=new Vector3(0,1.35,0); this.position=new Vector3();this.velocity=new Vector3();
     this.orientation=new Quaternion(); this.normal=new Vector3(0,.75,.66);this.nose=new Vector3(0,.66,-.75);
     this.right=new Vector3(1,0,0);this.wind=new Vector3();this.aero=new Vector3();this.force=new Vector3();
     this.time=0;this.windSpeed=5.5;this.profile='breeze';this.lineCapacity=65;this.lineLength=8;this.energy=100;this.boostRequested=false;this.exhausted=false;
+    this.flightSeed=seed>>>0;this.flightNumber=0;this.extremeGustEligible=false;this.extremeGustAt=30;
     this.heading=0;this.spin=0;this.tension=0;this.bend=0;this.maxHeight=0;this.flightTime=0;this.steadyTime=0;
     this.state='ready';this.action='hold';this.boost=false;this.spinSign=1;this.tugCooldown=0;this.lastTug=-100;
     this.pendingTug=0;this.tugCount=0;this.tugSequence=1;this.tugIndex=0;this.maneuverHold=0;this.turns=0;this.turnProgress=0;
@@ -45,6 +47,7 @@ export class KitePhysics {
   }
   launch() {
     this.reset();this.state='flying';this.position.set(this.anchor.x,2.1,this.anchor.z-7.6);this.velocity.set(0,3,-1.2);
+    const gust=flightGust(this.flightSeed,++this.flightNumber);this.extremeGustEligible=gust.eligible;this.extremeGustAt=gust.at;
     this.heading=this.trim.bias*.15;this.tension=.3;this.rope.reset();
   }
   setLineCapacity(meters){if(!LINE_CAPACITIES.includes(meters)||meters<this.lineLength)return false;this.lineCapacity=meters;return true;}
@@ -70,7 +73,7 @@ export class KitePhysics {
     const gust=this.profile==='gusts'?.42:this.profile==='strong'?.2:.09;
     const wave=Math.sin(t*.73+p.z*.008)*.54+Math.sin(t*1.73+1.4)*.29+Math.sin(t*3.21+.3)*.17;
     const height=1+.1*Math.log1p(Math.max(0,p.y)/6);
-    const speed=Math.max(0,strength*height*(1+gust*wave));
+    const speed=Math.max(0,strength*height*(1+gust*wave))*extremeGust(this);
     return out.set(speed*(Math.sin(t*.29)*.025+Math.sin(t*.87+p.y*.03)*gust*.11),speed*gust*.055*Math.sin(t*1.19),-speed);
   }
   updateAttitude(flow) {
@@ -86,7 +89,7 @@ export class KitePhysics {
     this.right.crossVectors(this.nose,this.normal).normalize();
     this.orientation.setFromRotationMatrix(this._basis.makeBasis(this.right,this.nose,this.normal));
   }
-  cutLine(edge=this.rope.contactEdge,fraction=.5){if(this.rope.broken<0)this.rope.breakAt(Math.max(3,edge),fraction);this.sawing=false;this.state='cut';this.tension=0;this.pendingTug=0;this.setControls('hold',false);}
+  cutLine(edge=this.rope.contactEdge,fraction=.5,reason='abrasion'){if(this.rope.broken<0){this.rope.cutReason=reason;this.rope.breakAt(clamp(Number.isFinite(edge)&&edge>=0?edge:18,0,this.rope.points.length-2),fraction);}this.sawing=false;this.state='cut';this.tension=0;this.pendingTug=0;this.setControls('hold',false);}
   step(dt) {
     this.time+=dt;this.tugCooldown=Math.max(0,this.tugCooldown-dt);this.maneuverHold=Math.max(0,this.maneuverHold-dt);this.windAt(this.position,this.wind);
     if(this.state==='cut'){this.velocity.x+=(this.wind.x*.35-this.velocity.x)*dt;this.velocity.z+=(this.wind.z*.35-this.velocity.z)*dt;this.velocity.y-=2.4*dt;this.position.addScaledVector(this.velocity,dt);this.heading+=dt*2;this.updateAttitude(this._flow.copy(this.wind).normalize());if(this.position.y<.42){this.position.y=.42;this.state='grounded';}this.rope.step(dt);return;}
@@ -153,6 +156,7 @@ export class KitePhysics {
     else this.steadyTime=Math.max(0,this.steadyTime-dt*.25);
     if(this.position.y<.42){this.position.y=.42;this.velocity.set(0,0,0);this.tension=0;this.pendingTug=0;this.state='grounded';}
     this.rope.step(dt);
+    updateWindStress(this,dt);
   }
   get lineRemaining(){return Math.max(0,this.lineCapacity-this.lineLength);}
   get slack(){return Math.max(0,this.lineLength-this.position.distanceTo(this.anchor));}

@@ -2,6 +2,7 @@ import {appearance} from '../game/appearance.js';
 import {mountSettings} from '../game/kite-shape.js';
 import {KitePhysics,DEFAULT_SETUP,clamp} from '../game/physics.js';
 import {Commission} from '../game/commission.js';
+import {mixSeed} from '../game/line-stress.js';
 import {Vector3,Quaternion} from '../game/vendor/three.module.js';
 
 export const STEP=1/240, STALE_MS=3500, GRACE_MS=25000;
@@ -37,7 +38,8 @@ function packPilot(p){return {setup:p.setup,body:packObject(p,['rope','trim','se
 function unpackPilot(p,data){p.configure(data.setup);unpackObject(p,data.body);unpackObject(p.rope,data.rope);}
 function disableAI(duel){duel.controlRival=()=>{};return duel;}
 export function createMatch(room){
-  const p=new KitePhysics(room.players[0].setup),duel=disableAI(new Commission(p));
+  const seed=Array.from(room.code||'TIRANTE').reduce((n,c)=>mixSeed(n^c.charCodeAt(0)),room.round||1);
+  const p=new KitePhysics(room.players[0].setup,{seed}),duel=disableAI(new Commission(p));
   p.profile=room.settings.profile;p.windSpeed=room.settings.wind;p.lineCapacity=room.settings.capacity;
   duel.rival.configure(room.players[1].setup);duel.start();
   for(const [i,k] of [p,duel.rival].entries()){k.anchor.set(i?1.2:-1.2,1.35,0);k.launch();k.time=0;k.spinSign=i?-1:1;}
@@ -87,7 +89,7 @@ export function advance(room,now){
   }
   room.match=packMatch(d);
 }
-function viewPilot(p){const rope=p.rope;return {setup:p.setup,body:packObject(p,['rope','trim','setup','aero','force']),rope:{points:rope.points.map(v=>v.toArray()),broken:rope.broken,breakPoint:rope.breakPoint?.toArray()||null,breakAge:rope.breakAge,contactPoint:rope.contactPoint.toArray(),contactEdge:rope.contactEdge,contactAge:rope.contactAge,contactLoad:rope.contactLoad,integrity:rope.integrity,wear:Array.from(rope.wear).flatMap((v,i)=>v?[[i,v]]:[])}};}
+function viewPilot(p){const rope=p.rope;return {setup:p.setup,body:packObject(p,['rope','trim','setup','aero','force']),rope:{points:rope.points.map(v=>v.toArray()),broken:rope.broken,breakPoint:rope.breakPoint?.toArray()||null,breakAge:rope.breakAge,contactPoint:rope.contactPoint.toArray(),contactEdge:rope.contactEdge,contactAge:rope.contactAge,contactLoad:rope.contactLoad,integrity:rope.integrity,stressLoad:rope.stressLoad,strength:rope.strength,stressRatio:rope.stressRatio,jamTime:rope.jamTime,cutReason:rope.cutReason,wear:Array.from(rope.wear).flatMap((v,i)=>v?[[i,v]]:[])}};}
 export function snapshot(room,slot,now){
   const d=room.match?unpackMatch(room.match):null;
   return {code:room.code,slot,round:room.round,serverTime:now,settings:room.settings,paused:room.paused,phase:d?.state||'waiting',players:room.players.map((p,i)=>p?{name:p.name,ready:p.ready,online:!p.left&&now-p.lastSeen<STALE_MS,left:p.left,slot:i}:null),ack:room.players[slot].seq,tugAck:room.players[slot].tugSeq,match:d?{pilots:[viewPilot(d.player),viewPilot(d.rival)],lastHit:d.lastHit?{i:d.lastHit.i,j:d.lastHit.j,s:d.lastHit.s,t:d.lastHit.t}:null,state:d.state,elapsed:d.elapsed,remaining:d.remaining,playerHealth:d.playerHealth,rivalHealth:d.rivalHealth,contact:d.contact,contactPoint:d.contactPoint.toArray(),pressure:d.pressure,sliding:d.sliding,reversals:d.reversals,engagements:d.engagements,message:d.message,result:d.result}:null};

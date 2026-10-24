@@ -1,4 +1,5 @@
 import {Vector3} from './vendor/three.module.js';
+import {LINE_STRENGTH} from './line-stress.js';
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const V=()=>new Vector3();
 export const ROPE_SEGMENTS=28,CONTACT_RADIUS=.008;
@@ -23,6 +24,7 @@ export class Tether {
     this.previous=this.points.map(q=>q.clone());this.velocities=this.points.map(V);this.weights=this.points.map((_,i)=>i===0||i===n?0:1);
     this.rest=Array(n).fill(p.lineLength/n);this.lambda=Array(n).fill(0);this.wear=new Float64Array(1201);this.broken=-1;this.breakPoint=null;
     this.contactLoad=0;this.contactEdge=-1;this.feedDelta=0;this.lastLength=p.lineLength;this.integrity=100;this.contactAge=100;this.breakAge=100;
+    this.stressLoad=0;this.strength=LINE_STRENGTH;this.stressRatio=0;this.overload=0;this.jamStrain=0;this.jamTime=0;this.shock=0;this.cutReason='';
   }
   moveAnchor(position){
     // The simulated hand and the visible reel share one endpoint. Move only the

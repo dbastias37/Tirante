@@ -1,4 +1,5 @@
 import {solveRopeSystem} from './rope-system.js';
+import {mixSeed} from './line-stress.js';
 import {Commission} from './commission.js';
 import {KitePhysics,DEFAULT_SETUP,clamp} from './physics.js';
 import {closestSegments,SawStroke} from './rope.js';
@@ -12,7 +13,7 @@ const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
 // A separate local controller leaves the two-seat network protocol unchanged.
 export class PartyCommission extends Commission{
   constructor(player){
-    super(player);this.pool=[this.rival,new KitePhysics(),new KitePhysics()];
+    super(player);this.pool=[this.rival,new KitePhysics(undefined,{seed:mixSeed(player.flightSeed^2)}),new KitePhysics(undefined,{seed:mixSeed(player.flightSeed^3)})];
     this.partyMode=false;this.roster=[];this.contacts=[];this.events=[];this.eventId=0;this.npcCount=1;this.duration=90;
   }
   get rivals(){return this.partyMode?this.roster.slice(1).map(e=>e.pilot):[this.rival];}
@@ -61,7 +62,8 @@ export class PartyCommission extends Commission{
   eliminate(e,reason,by=null){
     if(!e.alive)return;e.alive=false;e.reason=reason;e.eliminatedAt=this.elapsed;e.pilot.sawing=false;e.pilot.setControls('hold',false);
     if(reason==='Hilo cortado')e.pilot.cutLine(e.hit?.edge,e.hit?.fraction);
-    const text=e.index===0?(reason==='Hilo cortado'?'Se cortó tu hilo.':'Tu volantín tocó tierra.'):reason==='Hilo cortado'?`${e.name} perdió su hilo${by?by==='Tú'?' en el cruce contigo':` en el cruce con ${by}`:''}.`:`${e.name} tocó tierra.`;
+    const cause=e.pilot.rope.cutReason,detail=cause==='wind'?' por una ráfaga extrema':cause==='tension'?' por exceso de tensión':'';
+    const text=e.index===0?(reason==='Hilo cortado'?`Se cortó tu hilo${detail}.`:'Tu volantín tocó tierra.'):reason==='Hilo cortado'?`${e.name} perdió su hilo${detail|| (by?by==='Tú'?' en el cruce contigo':` en el cruce con ${by}`:'')}.`:`${e.name} tocó tierra.`;
     this.events.push({id:++this.eventId,time:this.elapsed,text});this.events=this.events.slice(-4);
   }
   resolveContacts(dt,physical=solveRopeSystem(this.roster.map(e=>e.pilot.rope),dt)){
@@ -98,7 +100,7 @@ export class PartyCommission extends Commission{
   }
   checkOutcome(){
     const playerAlive=this.roster[0].alive,remaining=this.aliveRivals;
-    if(!playerAlive||!remaining.length){this.finish(playerAlive?'win':remaining.length?'loss':'draw',playerAlive?'Dejaste fuera a todos los rivales.':remaining.length?this.roster[0].reason==='Hilo cortado'?'Cortaron tu hilo.':'Tu volantín tocó tierra.':'Todos quedaron fuera en el mismo cruce.');return;}
+    if(!playerAlive||!remaining.length){this.finish(playerAlive?'win':remaining.length?'loss':'draw',playerAlive?'Dejaste fuera a todos los rivales.':remaining.length?this.roster[0].reason==='Hilo cortado'?(this.player.rope.cutReason==='tension'?'Tu hilo cedió por exceso de tensión.':this.player.rope.cutReason==='wind'?'Una ráfaga extrema cortó tu hilo.':'Cortaron tu hilo.'):'Tu volantín tocó tierra.':'Todos quedaron fuera en el mismo cruce.');return;}
     if(this.remaining<=0){const diff=this.player.rope.integrity-Math.max(...remaining.map(e=>e.pilot.rope.integrity));this.finish(Math.abs(diff)<1?'draw':diff>0?'win':'loss',Math.abs(diff)<1?'Tiempo cumplido: compartes el hilo más entero.':diff>0?'Tiempo cumplido: tu hilo resistió más que todos.':'Tiempo cumplido: un rival conservó más hilo que tú.');}
   }
   step(dt){
@@ -114,7 +116,7 @@ export class PartyCommission extends Commission{
     this.resolveContacts(dt,physical);this.playerHealth=p.rope.integrity;
     if(!this.contact&&!this.focusEntry?.alive&&this.aliveRivals.length&&this.rival.rope.breakAge>2){this.rival=this.aliveRivals[0].pilot;this.lastHit=null;}
     this.rivalHealth=this.rival.rope.integrity;
-    this.message=this.contact?`Cruce con ${this.focusEntry.name} · alterna Q / E o mantén F.`:`Quedan ${this.aliveRivals.length} de ${this.npcCount} rivales. Busca su hilo y cuida tu energía.`;
+    this.message=this.contact?(p.rope.stressRatio>.8?'Tu hilo está al límite · mantén Q para descargar.':`Cruce con ${this.focusEntry.name} · tensa y da un tirón; evita llevar tu hilo al límite.`):`Quedan ${this.aliveRivals.length} de ${this.npcCount} rivales. Busca su hilo y cuida tu energía.`;
     this.checkOutcome();
   }
 }

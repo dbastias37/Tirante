@@ -69,8 +69,8 @@ export class CompactFlightUI {
     } else if (duel.visible) {
       this.$('compact-round-label').textContent = duel.partyMode ? `Party · ${duel.aliveRivals.length} rivales` : 'Duelo online';
       this.$('compact-round-clock').textContent = this.$('duel-timer').textContent;
-      this.$('compact-round-detail').textContent = `Tu hilo ${Math.ceil(duel.playerHealth)}%${duel.contact ? ' · Contacto' : ''}`;
-      round.classList.toggle('urgent', duel.playerHealth < 25);
+      this.$('compact-round-detail').textContent = `Tu hilo ${Math.ceil(duel.playerHealth)}%${duel.contact ? ` · Carga ${Math.round((p.rope.stressRatio||0)*100)}%` : ''}`;
+      round.classList.toggle('urgent', duel.playerHealth < 25 || p.rope.stressRatio > .8);
     }
   }
 }

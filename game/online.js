@@ -93,7 +93,7 @@ export class OnlineGame{
       while(view.rope.points.length<r.points.length)view.rope.points.push(new Vector3());view.rope.points.length=r.points.length;
       r.points.forEach((v,i)=>{const prev=canLerp?a.rope.points[i]:v;view.rope.points[i].set(prev[0]+(v[0]-prev[0])*t-offset[0],prev[1]+(v[1]-prev[1])*t,prev[2]+(v[2]-prev[2])*t-offset[2]);});
       view.rope.previous=this.viewRound===d.round&&previous.length===view.rope.points.length?previous:view.rope.points.map(p=>p.clone());
-      for(const key of ['broken','breakAge','contactEdge','contactAge','contactLoad','integrity'])view.rope[key]=r[key];
+      for(const key of ['broken','breakAge','contactEdge','contactAge','contactLoad','integrity','stressLoad','strength','stressRatio','jamTime','cutReason'])view.rope[key]=r[key];
       view.rope.contactPoint.fromArray(r.contactPoint).sub(new Vector3(offset[0],0,offset[2]));view.rope.breakPoint=r.breakPoint?new Vector3().fromArray(r.breakPoint).sub(new Vector3(offset[0],0,offset[2])):null;
       if(fresh){view.rope.wear.fill(0);for(const [i,n] of r.wear)view.rope.wear[i]=n;}
     }
