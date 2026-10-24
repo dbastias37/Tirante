@@ -1,0 +1,25 @@
+# Opción con guardado permanente. Requiere un servicio y un disco de pago.
+# Para una prueba gratuita, usa render-free.yaml como Blueprint Path.
+services:
+  - type: web
+    name: tirante
+    runtime: node
+    plan: 0.5c-512mb
+    numInstances: 1
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: DATA_DIR
+        value: /var/data/tirante
+      - key: TRUST_PROXY
+        value: "1"
+    disk:
+      name: tirante-data
+      mountPath: /var/data
+      sizeGB: 1

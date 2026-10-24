@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import {Vector3,Quaternion} from '../game/vendor/three.module.js';
+import {Tether,findRopeContact,resolveRopeContact,closestSegments,SawStroke,CONTACT_RADIUS} from '../game/rope.js';
+const dt=1/240,V=(x=0,y=0,z=0)=>new Vector3(x,y,z);
+function rope(a,b){const owner={anchor:a,position:b.clone().add(V(0,.06,-.23)),orientation:new Quaternion(),trim:{bias:0,lower:52},lineLength:a.distanceTo(b),tension:2,wind:V()};const r=new Tether(owner);r.dt=dt;return r;}
+const cross=closestSegments(V(-1,5,0),V(1,5,0),V(0,4,0),V(0,6,0));assert.ok(cross.distance<1e-8);assert.equal(cross.s,.5);assert.equal(cross.t,.5);
+const depth=closestSegments(V(-1,5,0),V(1,5,0),V(0,4,2),V(0,6,2));assert.ok(Math.abs(depth.distance-2)<1e-8);
+const a=rope(V(-2,5,0),V(2,5,0)),b=rope(V(0,5,-2),V(0,5,2));
+const hit=findRopeContact(a,b);assert.ok(hit,'Intersecting physical segments touch');const oldA=a.points.map(p=>p.clone()),oldB=b.points.map(p=>p.clone());
+const resolved=resolveRopeContact(a,b,hit,dt);assert.ok(resolved.load>0);assert.equal(resolved.slip,0,'Static contact has no sawing travel');assert.equal(a.integrity,100);assert.equal(b.integrity,100);
+assert.ok(a.points.some((p,i)=>p.distanceTo(oldA[i])>.001),'First cord deforms');assert.ok(b.points.some((p,i)=>p.distanceTo(oldB[i])>.001),'Second cord deforms');
+const pa=a.points[hit.i].clone().lerp(a.points[hit.i+1],hit.s),pb=b.points[hit.j].clone().lerp(b.points[hit.j+1],hit.t);assert.ok(pa.clone().sub(pb).dot(hit.normal)>=2*CONTACT_RADIUS-1e-6,'Contact separates the actual rendered vertices');
+const direction=V(1,0,0);assert.ok(a.loadPath(a.owner.position,direction)>a.owner.position.distanceTo(a.owner.anchor),'Contact adds a loaded detour');assert.ok(Math.abs(direction.y)>.001,'Contact changes the endpoint force direction');
+const distant=rope(V(0,5.2,-2),V(0,5.2,2));assert.equal(findRopeContact(a,distant),null,'A nearby screen crossing is not a physical contact');
+const sweepA=rope(V(-2,5,0),V(2,5,0)),sweepB=rope(V(0,5.2,-2),V(0,5.2,2));for(const p of sweepB.points)p.y-=.4;const swept=findRopeContact(sweepA,sweepB);assert.ok(swept?.swept,'Fast crossing detected between ticks');resolveRopeContact(sweepA,sweepB,swept,dt);assert.ok(sweepA.points.some(p=>Math.abs(p.y-5)>.01),'Swept collision receives a response');
+const parallelA=rope(V(-2,5,0),V(2,5,0)),parallelB=rope(V(-1,5,0),V(3,5,0));assert.ok(findRopeContact(parallelA,parallelB),'Parallel overlapping strands have a separation normal');
+const stroke=new SawStroke();for(let i=0;i<120;i++)stroke.step(.006,dt,i*dt);assert.equal(stroke.reversals,0,'Continuous reeling is not repeated sawing');assert.equal(stroke.factor(.5),.08);
+for(let i=0;i<240;i++)stroke.step(Math.floor(i/30)%2?.006:-.006,dt,.5+i*dt);assert.ok(stroke.reversals>=7);assert.equal(stroke.factor(1.5),1);
+const spam=new SawStroke();for(let i=0;i<240;i++)spam.step(i%2?.3:-.3,dt,i*dt);assert.equal(spam.reversals,0,'Sub-tick button spam cannot earn saw strokes');
+const worn=rope(V(-2,5,0),V(2,5,0));assert.equal(worn.abrade(14,.5,0),false);assert.equal(worn.integrity,100);
+for(let i=0;i<200;i++)worn.abrade(14,.5,.01);assert.ok(worn.integrity<1);assert.equal(worn.wearAt(3),0,'Wear stays at a material location, not a global hit score');
+const expected=worn.points[14].clone().lerp(worn.points[15],.5);worn.breakAt(14,.5);assert.ok(worn.breakPoint.distanceTo(expected)<1e-8,'Break occurs at the rubbing point');assert.equal(worn.points.length,31);assert.equal(worn.rest[worn.broken],0);assert.equal(findRopeContact(worn,b),null);
+for(let i=0;i<40;i++)worn.step(dt);assert.ok(worn.points[worn.broken].distanceTo(worn.points[worn.broken+1])>.04,'Two free ends recoil independently');assert.ok(worn.points.every(q=>Number.isFinite(q.length())));assert.ok(worn.points[0].distanceTo(worn.owner.anchor)<1e-8,'Hand end remains anchored');worn.reset();assert.equal(worn.broken,-1);assert.equal(worn.integrity,100);assert.ok(worn.wear.every(x=>x===0));
+console.log('PASS: 3D segment contact, depth separation, swept crossing, bilateral deformation, nonpenetration, force-path coupling, zero static wear, measured strokes, spam rejection, localized abrasion, exact fracture point, independent loose ends and reset.');

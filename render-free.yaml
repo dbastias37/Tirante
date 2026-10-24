@@ -1,0 +1,20 @@
+# SOLO PARA PRUEBAS: Render elimina los datos locales al reiniciar o desplegar.
+# Las salas y estampados funcionan mientras el proceso está activo.
+services:
+  - type: web
+    name: tirante-demo
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: DATA_DIR
+        value: /tmp/tirante-data
+      - key: TRUST_PROXY
+        value: "1"
