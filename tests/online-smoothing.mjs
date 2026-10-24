@@ -19,5 +19,7 @@ for(const slot of [0,1]){
  client.render(view.player,view,150);assert.ok(Math.abs(view.player.position.y-initial.y-4)<1e-7);
  client.latest=make(1,2);client.render(view.player,view,160);assert.ok(Math.abs(view.player.position.y-initial.y-1)<1e-7,'A new round discards the previous interpolation');
  client.latest=make(3,2);client.latest.code='IJKLMNPQ';client.render(view.player,view,170);assert.ok(Math.abs(view.player.position.y-initial.y-3)<1e-7,'A new room cannot blend into the old one');
+ // One frame per packet used to reset interpolation to zero indefinitely.
+ for(let frame=1;frame<=4;frame++){client.latest=make(frame+3,2);client.latest.code='IJKLMNPQ';client.render(view.player,view,170+frame*1000);assert.ok(Math.abs(view.player.position.y-initial.y-frame-3)<1e-7,'A throttled tab must catch up instead of freezing at every packet');}
 }
-console.log('PASS: jitter-free packet retargeting for both seats, line continuity, smooth paper animation, immediate round and room reset.');
+console.log('PASS: jitter-free packet retargeting for both seats, line continuity, smooth paper animation, room/round resets and background-tab catch-up.');

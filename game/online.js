@@ -72,7 +72,10 @@ export class OnlineGame{
         }
         return {body,rope:{broken:view.rope.broken,points:view.rope.points.map(q=>[q.x+this.visualOffset[0],q.y,q.z+this.visualOffset[2]])}};
       })}:null;
-      this.visualSnapshot=d;this.visualStarted=now;
+      // Count elapsed frame time even when every rendered frame receives a new
+      // packet (slow devices or background tabs). Restarting at zero each time
+      // would otherwise keep the kite frozen while the match clock advances.
+      this.visualSnapshot=d;this.visualStarted=this.visualRenderedAt??now;
     }
     const old=this.visualSource,t=old?clamp((now-this.visualStarted)/this.interval,0,1):1;
     const anchor=m.pilots[own].body.anchor.vector,prevAnchor=old?.pilots[own].body.anchor.vector||anchor;
@@ -96,7 +99,7 @@ export class OnlineGame{
     }
     // Snapshot interpolation also obeys non-crossing, independently of the
     // authoritative 240 Hz solver. Camera smoothing cannot undo a collision.
-    guardRopeMotion([p.rope,duel.rival.rope]);this.viewRound=d.round;this.visualOffset=offset;
+    guardRopeMotion([p.rope,duel.rival.rope]);this.viewRound=d.round;this.visualOffset=offset;this.visualRenderedAt=now;
     for(const key of ['state','elapsed','remaining','contact','pressure','sliding','reversals','engagements'])duel[key]=m[key];
     duel.playerHealth=own?m.rivalHealth:m.playerHealth;duel.rivalHealth=own?m.playerHealth:m.rivalHealth;duel.contactPoint.fromArray(m.contactPoint).sub(new Vector3(offset[0],0,offset[2]));
     duel.lastHit=m.lastHit?(own?{i:m.lastHit.j,j:m.lastHit.i,s:m.lastHit.t,t:m.lastHit.s}:m.lastHit):null;
