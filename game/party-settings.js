@@ -19,7 +19,9 @@ export class PartySettings{
       const card=node('div');card.className='party-npc-editor';card.style.setProperty('--rival',PARTY_NPCS[i].tint);
       const preview=node('div');preview.className='npc-preview';preview.id=`party-preview-${i}`;card.append(preview);
       const field=(labelText,el)=>{const label=node('label',labelText);label.htmlFor=el.id;label.append(el);card.append(label);};
-      const name=node('input');name.id=`party-name-${i}`;name.value=s.name;name.maxLength=24;name.disabled=locked;name.addEventListener('change',()=>{s.name=name.value.trim()||PARTY_NPCS[i].name;name.value=s.name;this.save();});field(`Nombre del NPC ${i+1}`,name);
+      const name=node('input');name.id=`party-name-${i}`;name.value=s.name;name.maxLength=24;name.disabled=locked;
+      const saveName=()=>{s.name=name.value.replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,24)||PARTY_NPCS[i].name;const image=preview.querySelector('img');if(image)image.alt=`Estampado de ${s.name}`;this.save();};
+      name.addEventListener('input',saveName);name.addEventListener('change',()=>{saveName();name.value=s.name;});field(`Nombre del NPC ${i+1}`,name);
       const style=node('select');style.id=`party-design-${i}`;
       for(const [value,label]of[['classic','Clásico'],['solid','Color liso'],['image','Imagen propia']]){const option=node('option',label);option.value=value;style.append(option);}
       style.value=s.sailStyle;style.disabled=locked;style.addEventListener('change',()=>{if(style.value==='image'&&!s.printId){style.value=s.sailStyle;file.click();return;}s.sailStyle=style.value;this.save();this.preview(i);});field('Diseño',style);
