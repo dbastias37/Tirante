@@ -11,7 +11,7 @@ for(const count of [1,2,3]){
  const d=party(count);assert.equal(d.roster.length,count+1);assert.equal(d.rivals.length,count);assert.equal(new Set(d.roster.map(e=>e.pilot.anchor.x)).size,count+1);
  assert.ok(d.rivals.every(p=>p.lineCapacity===d.player.lineCapacity&&p.windSpeed===d.player.windSpeed&&p.energy===100));
  const times=d.roster.map(e=>e.pilot.time);step(d,.5);d.roster.forEach((e,i)=>assert.ok(Math.abs(e.pilot.time-times[i]-.5)<1e-9,'Every pilot advances exactly once per fixed tick'));
- step(d,2.6);assert.equal(d.state,'playing');assert.equal(d.duration,count===1?90:120);
+ step(d,5.6);assert.equal(d.state,'playing');assert.equal(d.duration,count===1?180:240);
 }
 assert.equal(party(99).npcCount,3);assert.equal(party(-1).npcCount,1);
 // Every unordered pair can contact, including the three NPC/NPC pairs.
@@ -29,14 +29,14 @@ const multi=party();multi.state='playing';const calls=[0,0,0,0];multi.roster.for
 const noContact=party();noContact.state='playing';noContact.roster.forEach((e,i)=>fixture(e,v(i*20,2,0),v(i*20,10,-5)));for(let n=0;n<100;n++){noContact.roster.forEach(e=>e.pilot.rope.feedDelta=n%2?.02:-.02);noContact.elapsed+=dt;noContact.resolveContacts(dt);}assert.ok(noContact.roster.every(e=>e.pilot.rope.integrity===100),'No remote damage');
 const knockout=party();knockout.state='playing';const first=knockout.roster[1];first.hit={edge:12,fraction:.4};const expected=first.pilot.rope.points[12].clone().lerp(first.pilot.rope.points[13],.4);knockout.eliminate(first,'Hilo cortado');knockout.checkOutcome();assert.equal(knockout.state,'playing');assert.equal(knockout.aliveRivals.length,2);assert.ok(first.pilot.rope.breakPoint.distanceTo(expected)<1e-9);assert.equal(first.pilot.rope.points.length,31);
 knockout.eliminate(knockout.roster[2],'En tierra');knockout.checkOutcome();assert.equal(knockout.state,'playing');knockout.eliminate(knockout.roster[3],'Hilo cortado');knockout.checkOutcome();assert.equal(knockout.result.outcome,'win');assert.equal(knockout.result.eliminated,3);
-const lose=party();lose.state='playing';lose.eliminate(lose.roster[0],'En tierra');lose.checkOutcome();assert.equal(lose.result.outcome,'loss');assert.equal(lose.result.standings.length,4);
+const lose=party();lose.state='playing';lose.eliminate(lose.roster[0],'En tierra');lose.checkOutcome();assert.equal(lose.result,null);assert.equal(lose.spectating,true);assert.equal(lose.survivors.length,3);lose.eliminate(lose.roster[1],'En tierra');lose.eliminate(lose.roster[2],'En tierra');lose.checkOutcome();assert.equal(lose.result.outcome,'loss');assert.equal(lose.result.winner,'Nico');assert.equal(lose.result.standings.length,4);
 const draw=party();draw.state='playing';draw.roster.forEach(e=>draw.eliminate(e,'Hilo cortado'));draw.checkOutcome();assert.equal(draw.result.outcome,'draw');
 for(const [wears,outcome] of [[[0,.2,.3,.4],'win'],[[.2,.1,.3,.4],'loss'],[[0,0,.3,.4],'draw']]){const d=party();d.state='playing';d.remaining=0;wears.forEach((wear,i)=>d.roster[i].pilot.rope.abrade(12,.5,wear));d.checkOutcome();assert.equal(d.result.outcome,outcome);}
 knockout.startParty(2,'hard');assert.equal(knockout.roster.length,3);assert.equal(knockout.result,null);assert.equal(knockout.events.length,0);assert.ok(knockout.roster.every(e=>e.alive&&e.pilot.rope.broken===-1&&e.pilot.rope.integrity===100&&e.pilot.energy===100));knockout.stop();assert.equal(knockout.visible,false);assert.equal(knockout.partyMode,false);assert.equal(knockout.rivals.length,1);assert.equal(knockout.rival,knockout.pool[0]);assert.equal(knockout.rival.partyTint,undefined,'Online inherits no local-party tint');
 // Complete natural rounds prove contacts and sequential eliminations are reachable.
 for(const count of [1,2,3])for(const strategy of ['idle','saw']){
  const d=party(count);let survivedElimination=false;const clock=performance.now();
- for(let tick=0;tick<240*125&&d.active;tick++){
+ for(let tick=0;tick<240*247&&d.active;tick++){
   if(strategy==='saw'&&d.state==='playing')d.player.sawing=true;d.player.step(dt);d.step(dt);
   if(d.state==='playing'&&d.aliveRivals.length<count)survivedElimination=true;
   if(tick%240===0)for(const e of d.roster){assert.ok(Number.isFinite(e.pilot.position.length()+e.pilot.energy+e.pilot.tension));assert.ok(e.pilot.position.length()<300);assert.ok(e.pilot.energy>=0&&e.pilot.energy<=100);assert.ok(e.pilot.rope.points.every(p=>Number.isFinite(p.length())));}

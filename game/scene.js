@@ -162,7 +162,7 @@ export class Landscape {
   }
   resize(){this.width=window.innerWidth;this.height=window.innerHeight;this.camera.aspect=this.width/this.height;this.camera.updateProjectionMatrix();this.renderer.setSize(this.width,this.height,false);}
   configure(s){this.kite.configure(s);}
-  drag(dx,dy){if(this.orbit.active){this.orbit.drag(dx,dy);return;}if(this.follow){this.camera.getWorldDirection(this.forward);this.yaw=Math.atan2(this.forward.x,-this.forward.z);this.pitch=Math.asin(this.forward.y);}this.follow=false;this.yaw-=dx*.0035;this.pitch=clamp(this.pitch+dy*.003,-.35,1.4);}
+  drag(dx,dy){if(this.orbit.active||this.duel?.spectating&&this.duel.watched){this.orbit.drag(dx,dy);return;}if(this.follow){this.camera.getWorldDirection(this.forward);this.yaw=Math.atan2(this.forward.x,-this.forward.z);this.pitch=Math.asin(this.forward.y);}this.follow=false;this.yaw-=dx*.0035;this.pitch=clamp(this.pitch+dy*.003,-.35,1.4);}
   updateTether(line,p){
     const r=p.rope,attr=line.geometry.attributes.position,colors=line.geometry.attributes.color,fray=line.userData.fray.geometry.attributes.position;let index=0,fi=0;
     const tint=new THREE.Color();
@@ -177,7 +177,7 @@ export class Landscape {
     line.userData.tips.visible=r.broken>=0&&line.visible;if(r.broken>=0){const tips=line.userData.tips.geometry.attributes.position;for(let k=0;k<2;k++){const q=r.points[r.broken+k];tips.setXYZ(k,q.x,q.y,q.z);}tips.needsUpdate=true;}
   }
   render(dt,mode,paused){
-    const p=this.physics,intro=mode==='intro',inDuel=!intro&&!!this.duel?.visible;const orbital=!intro&&this.orbit.active;if(!orbital)positionView(this.camera,inDuel,dt,this.duel?.partyMode?this.duel.npcCount:1);const orbitFrame=orbital?this.orbit.frame(this.camera,p.position,dt):null,duelFrame=inDuel&&!orbital?frameDuel(this.camera,this.duel):null;this.time=p.time;
+    const p=this.physics,intro=mode==='intro',inDuel=!intro&&!!this.duel?.visible;const spectating=!!this.duel?.spectating,watched=spectating?this.duel.watched?.pilot:null;const orbital=!intro&&(this.orbit.active||!!watched);if(!orbital)positionView(this.camera,inDuel,dt,this.duel?.partyMode?this.duel.npcCount:1);const orbitFrame=orbital?this.orbit.frame(this.camera,watched?.position||p.position,dt):null,duelFrame=inDuel&&!orbital?frameDuel(this.camera,this.duel):null;this.time=p.time;
     if(this.inDuel!==inDuel){this.inDuel=inDuel;this.renderer.setPixelRatio(renderPixelRatio(window.devicePixelRatio,inDuel));}
     for(const cloud of this.clouds)cloud.position.x=cloud.userData.baseX+Math.sin(p.time*.008)*9;
     if(intro){this.kite.group.position.set((this.width<760?1.7:4.3)+Math.sin(p.time*.47)*.25,p.profile==='calm'?.5:(this.width<760?7.4:6.1)+Math.sin(p.time*.7)*.2,-14);this.kite.group.rotation.set(-.38,.1,Math.sin(p.time*.66)*.08-.13);this.kite.group.scale.setScalar(1.45);}
@@ -192,7 +192,7 @@ export class Landscape {
     if(orbital)this.camera.quaternion.copy(this.targetCamera.quaternion);else this.camera.quaternion.slerp(this.targetCamera.quaternion,1-Math.exp(-dt*(intro?2:3.5)));
     const fov=intro?50:orbitFrame?orbitFrame.fov:duelFrame?(this.follow?duelFrame.fov:74):(this.zoom?35:this.width<760?63:54);this.camera.fov=mix(this.camera.fov,fov,1-Math.exp(-dt*6));this.camera.updateProjectionMatrix();
     const tugPulse=Math.sin(clamp((p.time-p.lastTug)/.2,0,1)*Math.PI);
-    this.handRig.visible=!intro&&!orbital;this.handRig.position.y=(this.width<760?-.14:-.255)+Math.sin(p.time*1.6)*.002-tugPulse*.026;this.handRig.position.x=this.width<760?.11:.29;this.handRig.position.z=-.57;this.handRig.position.add(handViewOffset(this.camera));
+    this.handRig.visible=!intro&&!orbital&&!spectating;this.handRig.position.y=(this.width<760?-.14:-.255)+Math.sin(p.time*1.6)*.002-tugPulse*.026;this.handRig.position.x=this.width<760?.11:.29;this.handRig.position.z=-.57;this.handRig.position.add(handViewOffset(this.camera));
     if(!paused&&p.action!=='hold')this.spool.rotation.x+=dt*(p.action==='reel'?3:-3)*(p.boost?2.5:1);
     this.scene.updateMatrixWorld();
     this.worldEnd.copy(this.kite.junction);this.kite.group.localToWorld(this.worldEnd);

@@ -1,5 +1,5 @@
 // Shared by WebGL and the Canvas compatibility renderer.
-export const PAPER_OPACITY = .4;
+export const PAPER_OPACITY = .45;
 export const FIELD_SIZE = 800;
 export const CAMERA_FAR = 1200;
 export const SKY_RADIUS = 900;

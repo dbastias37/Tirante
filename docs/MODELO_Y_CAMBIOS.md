@@ -172,3 +172,14 @@ El guardado continuo del movimiento y el recogido de contactos ahora comparten l
 Cada lanzamiento deriva una sola selección del 10 % de una semilla por vuelo. Para viento base de al menos 8 m/s y perfil distinto de calma, esa selección puede producir una ráfaga de 2,4 s entre los segundos 12 y 30. La intensidad sube y baja suavemente hasta 2,55 veces el viento normal; entra en las fuerzas aerodinámicas reales del simulador. No se resta vida al azar: el corte requiere superar la resistencia durante suficiente tiempo, después de la fase inicial de lanzamiento. Soltar rápido puede salvar el hilo, pero sigue siendo necesario controlar el giro y evitar tocar tierra. La selección, la dosis, el desgaste y el motivo del corte se conservan al serializar una sala; los dos asientos reciben el resultado del servidor.
 
 Los valores de resistencia, pulso y ráfaga son calibración de jugabilidad. El 10 % se refiere a la selección por vuelo, no a un porcentaje de cortes garantizado para toda duración, viento o técnica de control.
+
+
+## Party y supervivencia · 1.10.0
+
+El papel usa alpha 0,45: corresponde al 55 % de transparencia solicitado. Los participantes parten en x = 0, 6, −6 y 12 m, con 6 s de preparación. Los pasos de los NPC conservan al menos 2,5 m entre pilotos; nunca mueven directamente el volantín. El trabajo local de fractura por desgaste pasa de 1,2 a 3,6 unidades y la dosis de sobrecarga en un cruce de 0,03 a 0,06 segundos normalizados. Son reglas simétricas para humanos y NPC; el corte por ráfaga libre conserva la dosis de 0,03.
+
+La IA decide cada 0,18 s (Hábil) o 0,10 s (Competitivo). Escoge el rival vivo más cercano, aproxima los segmentos reales del hilo, hace barridos controlados para buscar contacto, recoge para igualar distancia, descarga por sobrecarga, protege energía y usa tirones cuando tiene margen frente a un hilo rival exigido. Sigue sujeta a los controles y a la misma física. No garantiza victoria ni recuperación de cualquier picada.
+
+Party mantiene el estado `playing` cuando el jugador cae y quedan al menos dos pilotos. `spectating` desactiva sus controles; la cámara orbital sigue a un superviviente o la cámara general encuadra solo a los que siguen en juego. Cambiar el observado o la cámara no modifica la simulación. Los NPC siguen eligiendo rivales vivos. En Último en pie no hay desempate por reloj: la partida concluye con cero o un superviviente. La variante con tiempo conserva la comparación de integridad al acabar los 180/240 s, considerando solo participantes vivos.
+
+Una cuerda intacta cuyo dueño está en `grounded` se fractura antes de reunir contactos, con motivo `ground`. Conserva su estado de aterrizaje y los dos extremos visibles; no participa después en las barreras de colisión. La limpieza se aplica también al duelo de dos asientos, y los mensajes distinguen aterrizar de perder el hilo durante el vuelo.

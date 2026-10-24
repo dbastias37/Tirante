@@ -81,6 +81,12 @@ export function guardRopeMotion(ropes,blockedContacts=null){
   return minimum;
 }
 export function solveRopeSystem(ropes,dt){
+  // A grounded kite is out of the contest. Its slack strand must not become
+  // a permanent barrier: release both free ends before the collision pass.
+  for(const r of ropes)if(r.broken<0&&r.owner.state==='grounded'){
+    r.cutReason='ground';r.breakAt(r.contactEdge>=0?r.contactEdge:Math.min(14,r.points.length-2),.5);
+    r.contactAge=100;
+  }
   const intact=ropes.filter(r=>r.broken<0);if(!intact.length)return [];
   for(const r of intact){r._blockedMotion=0;r.dt=dt;}
   let contacts=gather(ropes),all=[...contacts];

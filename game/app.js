@@ -5,7 +5,8 @@ import {CompactFlightUI} from './compact-ui.js';
 import {LightTrail,TRAIL_VERSION,formatTrailTime as formatTime} from './trail.js';
 import {solveRopeSystem} from './rope-system.js';
 import {KitePhysics,DEFAULT_SETUP,configuration,clamp} from './physics.js';
-import {PartyCommission,PARTY_NPCS} from './party.js';
+import {PartyCommission,escapeHTML} from './party.js';
+import {PartySettings} from './party-settings.js';
 import {drawContact} from './contact-view.js';
 import {Landscape} from './scene.js';
 import {OnlineGame} from './online.js';
@@ -32,18 +33,18 @@ if(['breeze','gusts','strong','calm'].includes(saved.profile))physics.profile=sa
 if(Number.isFinite(saved.windSpeed))physics.windSpeed=clamp(saved.windSpeed,1,12);
 let record=Number.isFinite(saved.record)?Math.max(0,saved.record):0,assists=saved.assists!==false;
 const trail=new LightTrail(physics);let trailBest=saved.trailVersion===TRAIL_VERSION&&Number.isFinite(saved.trailBest)&&saved.trailBest>0?saved.trailBest:null,trailResultShown=false,trailFinishedAt=0,trailNewBest=false;
-let online=null,compactUI=null,workshopDesign=null;
+let online=null,compactUI=null,workshopDesign=null,partyUI=null;
 let landscape, mode='intro',modal=null,previousFocus=null,setupChanged=false,toastTimeout,drag=null,audio=null,shiftDown=false,boostLatched=false;
 const keys=new Set(),pointers=new Map();let zoom=false,graphTime=0,lastUi=0,windHistory=Array(48).fill(14),accumulator=0,lastTime=0;
-function save(){try{localStorage.setItem(STORAGE,JSON.stringify({setup,profile:trail.saved?.profile||physics.profile,windSpeed:trail.saved?.windSpeed??physics.windSpeed,record,assists,lineCapacity:trail.saved?.lineCapacity??physics.lineCapacity,duelStats,partyCount,trailBest,trailVersion:TRAIL_VERSION}));storageAvailable=true;}catch{storageAvailable=false;}}
+function save(){try{localStorage.setItem(STORAGE,JSON.stringify({setup,profile:trail.saved?.profile||physics.profile,windSpeed:trail.saved?.windSpeed??physics.windSpeed,record,assists,lineCapacity:trail.saved?.lineCapacity??physics.lineCapacity,duelStats,partyCount,partyOptions:partyUI?.value||saved.partyOptions,trailBest,trailVersion:TRAIL_VERSION}));storageAvailable=true;}catch{storageAvailable=false;}}
 function toast(message){$('toast').textContent=message;$('toast').classList.remove('hidden');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>$('toast').classList.add('hidden'),4200);}
 function releaseAll(){keys.clear();pointers.clear();shiftDown=false;boostLatched=false;if(!online?.active){physics.sawing=false;physics.setControls('hold',false);}updateControlState();}
 function updateControlState(){
   const releasing=[...pointers.values()].includes('release')||keys.has('q'),reeling=[...pointers.values()].includes('reel')||keys.has('e');
-  const active=!modal&&mode==='flight'&&duel.state!=='preparing'&&duel.state!=='finished'&&trail.state!=='preparing'&&trail.state!=='finished',requested=active&&(shiftDown||boostLatched),boost=requested&&!physics.exhausted&&physics.energy>0;
+  const active=!duel.spectating&&!modal&&mode==='flight'&&duel.state!=='preparing'&&duel.state!=='finished'&&trail.state!=='preparing'&&trail.state!=='finished',requested=active&&(shiftDown||boostLatched),boost=requested&&!physics.exhausted&&physics.energy>0;
   const saw=active&&duel.state==='playing'&&(keys.has('f')||[...pointers.values()].includes('saw')),action=!active?'hold':reeling?'reel':releasing?'release':'hold';
   if(online?.active)online.controls({action,boost:requested,saw,x:active?Number(keys.has('d')||[...pointers.values()].includes('right'))-Number(keys.has('a')||[...pointers.values()].includes('left')):0,z:active?Number(keys.has('s')||[...pointers.values()].includes('back'))-Number(keys.has('w')||[...pointers.values()].includes('forward')):0});else{physics.sawing=saw;physics.setControls(saw?physics.action:action,requested);}
-  $('saw-button').classList.toggle('pressed',physics.sawing);$('saw-button').setAttribute('aria-pressed',physics.sawing);$('saw-button').disabled=duel.state!=='playing';
+  $('saw-button').classList.toggle('pressed',physics.sawing);$('saw-button').setAttribute('aria-pressed',physics.sawing);$('saw-button').disabled=duel.state!=='playing'||duel.spectating;
   $('release-button').classList.toggle('pressed',physics.action==='release');$('reel-button').classList.toggle('pressed',physics.action==='reel');
   $('action-label').textContent={hold:'MANTENER',release:'SOLTANDO',reel:'RECOGIENDO'}[physics.action];
   $('action-line').style.width=physics.action==='release'?'24px':physics.action==='reel'?'52px':'38px';
@@ -59,7 +60,7 @@ function openModal(id){compactUI?.setCameraTools(false);if(id==='trail-modal'&&o
 function closeModal(){const old=modal;modal=null;$('overlay').classList.add('hidden');if(old==='workshop'&&setupChanged){physics.reset();if(mode==='flight')toast('Ajustes guardados. Prueba un nuevo lanzamiento.');}previousFocus?.focus?.({preventScroll:true});updateUI();}
 function goFlying(){if(online?.active){leaveCommission();return;}stopTrail();duel.stop();closeModal();physics.reset();setMode('flight');toast(compactUI?.query.matches?'Mantén Soltar o Recoger. Activa Boost para acelerar.':'Q / E: soltar y recoger · Shift: boost · Shift + Espacio: doble tirón.');}
 function launch(){if(modal||mode!=='flight'||duel.visible||trail.visible)return;physics.launch();updateControlState();landscape.follow=true;updateFollow();if(physics.windSpeed<1.8||physics.profile==='calm')toast('Puedes probar, pero sin suficiente viento volverá a tierra.');updateUI();}
-function tug(double=physics.boost){if(mode!=='flight'||modal||duel.state==='preparing'||duel.state==='finished'||trail.state==='preparing'||trail.state==='finished')return;if(physics.state!=='flying'){launch();return;}if(online?.active){online.tug(double);return;}if(physics.tug(double))updateUI();else if(physics.energy<(double?14:7))toast('Falta energía para ese tirón. Suelta los controles para descansar.');}
+function tug(double=physics.boost){if(duel.spectating)return;if(mode!=='flight'||modal||duel.state==='preparing'||duel.state==='finished'||trail.state==='preparing'||trail.state==='finished')return;if(physics.state!=='flying'){launch();return;}if(online?.active){online.tug(double);return;}if(physics.tug(double))updateUI();else if(physics.energy<(double?14:7))toast('Falta energía para ese tirón. Suelta los controles para descansar.');}
 
 function updateTrailMenu(){
   $('trail-start').textContent=trail.visible?'Empezar de nuevo ↺':'Comenzar recorrido ↗';
@@ -74,15 +75,14 @@ function showTrailResult(){
   const r=trail.result;if(!r)return;trailResultShown=true;$('trail-medal').textContent=r.won?`MEDALLA DE ${r.medal.toUpperCase()}`:'RASTRO DE LUZ';$('trail-result-title').textContent=r.won?'El recorrido es tuyo.':'Queda cielo por descubrir.';$('trail-result-time').textContent=formatTime(r.seconds,true);$('trail-result-captures').textContent=`${r.collected} DE ${r.total} DESTELLOS`;$('trail-result-reason').textContent=r.reason;$('trail-new-best').textContent=trailNewBest?'Nueva mejor vuelta en este navegador.':trailBest?`Tu mejor vuelta: ${formatTime(trailBest,true)}`:'Prueba soltadas cortas y espera la respuesta del volantín.';openModal('trail-result-modal');
 }
 function updateCamera(){
-  const orbit=landscape.orbit.active;document.body.classList.toggle('orbiting',orbit&&mode==='flight');$('camera-button').innerHTML=`Cámara: ${orbit?'orbital':'1ª persona'} <kbd>V</kbd>`;$('camera-button').setAttribute('aria-pressed',orbit);$('orbit-zoom').classList.toggle('hidden',!orbit);$('orbit-distance').textContent=landscape.orbit.distance.toFixed(1)+' m';
+  const orbit=landscape.orbit.active||!!(duel.spectating&&duel.watched);document.body.classList.toggle('orbiting',orbit&&mode==='flight');$('camera-button').innerHTML=`Cámara: ${orbit?'orbital':'1ª persona'} <kbd>V</kbd>`;$('camera-button').setAttribute('aria-pressed',orbit);$('orbit-zoom').classList.toggle('hidden',!orbit);$('orbit-distance').textContent=landscape.orbit.distance.toFixed(1)+' m';
 }
-function toggleCamera(){landscape.orbit.active=!landscape.orbit.active;landscape.follow=true;updateFollow();}
-function centerCamera(){if(landscape.orbit.active)landscape.orbit.reset();else{landscape.follow=!landscape.follow;if(!landscape.follow){landscape.camera.getWorldDirection(landscape.forward);landscape.yaw=Math.atan2(landscape.forward.x,-landscape.forward.z);landscape.pitch=Math.asin(landscape.forward.y);}}updateFollow();}
+function toggleCamera(){if(duel.spectating){if(duel.watched)duel.spectatorIndex=-1;else duel.spectateNext();landscape.orbit.active=false;landscape.follow=true;updateFollow();return;}landscape.orbit.active=!landscape.orbit.active;landscape.follow=true;updateFollow();}
+function centerCamera(){if(landscape.orbit.active||duel.spectating&&duel.watched)landscape.orbit.reset();else{landscape.follow=!landscape.follow;if(!landscape.follow){landscape.camera.getWorldDirection(landscape.forward);landscape.yaw=Math.atan2(landscape.forward.x,-landscape.forward.z);landscape.pitch=Math.asin(landscape.forward.y);}}updateFollow();}
 
 const counted=(n,one,many)=>`${n} ${n===1?one:many}`;
 function updatePartyRoster(){
-  $('party-roster').innerHTML=PARTY_NPCS.slice(0,partyCount).map(n=>`<div style="--rival:${n.tint}"><span class="party-diamond">◇</span><strong>${n.name}</strong><small>${n.style}</small></div>`).join('');
-  $('party-duration').textContent=partyCount===1?'90 segundos':'120 segundos';
+  partyUI?.render(partyCount,duel.active);
   $('party-count').value=partyCount;
   $('commission-start').innerHTML=`Jugar 1 vs ${partyCount} NPC <span>↗</span>`;
 }
@@ -93,19 +93,19 @@ function updateCommissionMenu(){
   $('commission-start').classList.toggle('hidden',duel.active);$('commission-resume').classList.toggle('hidden',!duel.active);$('commission-leave').classList.toggle('hidden',!duel.active);$('match-active-note').classList.toggle('hidden',!duel.active);$('npc-level').disabled=duel.active;
 }
 function startCommission(){
-  if(online?.active){online.open();return;}
+  if(online?.active){online.open();return;}if(partyUI.busy)return;
   stopTrail();physics.networkControlled=false;duel.rival.networkControlled=false;physics.configure(setup);landscape.configure(setup);landscape.rivalKite?.configure({...setup,color:'teal'});
   closeModal();if(physics.profile==='calm'){physics.profile='breeze';physics.windSpeed=6.5;save();}
-  setMode('flight');duel.startParty(partyCount,$('npc-level').value);landscape.configureRivals?.(duel.rivals);duelRecorded=false;resultShown=false;resultAt=0;landscape.follow=true;zoom=false;landscape.zoom=false;$('zoom-button').innerHTML='Acercar <span>＋</span>';$('zoom-button').setAttribute('aria-pressed','false');$('contact-detail').open=false;updateFollow();updateControlState();updateUI();
+  setMode('flight');duel.startParty(partyCount,$('npc-level').value,partyUI.value);landscape.configureRivals?.(duel.rivals);duelRecorded=false;resultShown=false;resultAt=0;landscape.follow=true;zoom=false;landscape.zoom=false;$('zoom-button').innerHTML='Acercar <span>＋</span>';$('zoom-button').setAttribute('aria-pressed','false');$('contact-detail').open=false;updateFollow();updateControlState();updateUI();
 }
 function recordCommission(){if(online?.active)return;if(!duel.result||duelRecorded)return;duelRecorded=true;duelStats[{win:'wins',loss:'losses',draw:'draws'}[duel.result.outcome]]++;save();}
 function leaveCommission(){stopTrail();if(online?.active){online.leave();duel.stop();physics.networkControlled=false;duel.rival.networkControlled=false;physics.anchor.set(0,1.35,0);physics.configure(setup);landscape.configure(setup);physics.reset();closeModal();setMode('flight');return;}if(duel.active)duel.finish('loss','Abandonaste la comisión.');recordCommission();duel.stop();closeModal();physics.reset();setMode('flight');}
 function showCommissionResult(){
-  const r=duel.result;if(!r)return;resultShown=true;renderPartyResults(r);$('result-title').textContent={win:'¡La Party es tuya!',loss:'Se terminó tu vuelo.',draw:'El cielo queda parejo.'}[r.outcome];$('result-reason').textContent=r.reason;$('result-player').textContent=r.playerHealth+'%';$('result-rival').textContent=r.rivalHealth+'%';$('result-detail').textContent=`${r.seconds} segundos · ${duel.engagements} cruces · ${counted(duelStats.wins,'victoria','victorias')}`;openModal('result-modal');
+  const r=duel.result;if(!r)return;resultShown=true;renderPartyResults(r);$('result-title').textContent=r.winner?`${r.winner} ganó la Party`:'El cielo queda parejo.';$('result-reason').textContent=r.reason;$('result-player').textContent=r.playerHealth+'%';$('result-rival').textContent=r.rivalHealth+'%';$('result-detail').textContent=`${r.seconds} segundos · ${duel.engagements} cruces · ${counted(duelStats.wins,'victoria','victorias')}`;openModal('result-modal');
 }
 
 function renderPartyResults(r){
-  $('party-results').innerHTML=r.standings.map(e=>`<div style="--rival:${e.tint}"><strong>${e.name}</strong><span>${e.reason}</span><b>${e.health}%</b></div>`).join('');
+  $('party-results').innerHTML=r.standings.map(e=>`<div style="--rival:${e.tint}"><strong>${escapeHTML(e.name)}</strong><span>${escapeHTML(e.reason)}</span><b>${e.health}%</b></div>`).join('');
   $('party-result-summary').textContent=`1 vs ${r.npcCount} NPC · ${r.eliminated} de ${r.npcCount} rivales fuera`;
 }
 function buildWorkshop(){
@@ -131,7 +131,7 @@ function updateWorkshop(){
 function setWorkshopTab(value){const tab=value===true?'material':value===false?'bridles':value;for(const name of ['bridles','material','design']){const selected=name===tab;$(name==='bridles'?'tab-bridles':'tab-'+name).classList.toggle('active',selected);$(name==='bridles'?'tab-bridles':'tab-'+name).setAttribute('aria-selected',selected);$(name==='bridles'?'bridle-settings':name+'-settings').classList.toggle('hidden',!selected);}$('blueprint').classList.toggle('design-view',tab==='design');workshopDesign?.updateView();}
 
 function updateWindSettings(){all('[data-wind]').forEach(el=>el.classList.toggle('selected',el.dataset.wind===physics.profile));$('wind-strength').value=physics.windSpeed;$('wind-strength-output').textContent=(physics.windSpeed*3.6).toFixed(1);$('wind-strength-setting').classList.toggle('inactive',physics.profile==='calm');$('wind-strength').disabled=physics.profile==='calm';}
-function updateFollow(){updateCamera();if(landscape.orbit.active){$('follow-button').classList.add('active');$('follow-button').setAttribute('aria-pressed','true');$('follow-button').innerHTML='Centrar órbita <kbd>C</kbd>';return;}$('follow-button').classList.toggle('active',landscape.follow);$('follow-button').setAttribute('aria-pressed',landscape.follow);$('follow-button').innerHTML=`<span class="follow-dot"></span> ${landscape.follow?(duel.visible?(duel.partyMode?'Ver todos':'Ver ambos'):'Seguir volantín'):'Mirada libre'} <kbd>C</kbd>`;}
+function updateFollow(){updateCamera();if(landscape.orbit.active||duel.spectating&&duel.watched){$('follow-button').classList.add('active');$('follow-button').setAttribute('aria-pressed','true');$('follow-button').innerHTML='Centrar órbita <kbd>C</kbd>';return;}$('follow-button').classList.toggle('active',landscape.follow);$('follow-button').setAttribute('aria-pressed',landscape.follow);$('follow-button').innerHTML=`<span class="follow-dot"></span> ${landscape.follow?(duel.visible?(duel.partyMode?'Ver todos':'Ver ambos'):'Seguir volantín'):'Mirada libre'} <kbd>C</kbd>`;}
 function toggleZoom(){if(duel.visible)return;zoom=!zoom;landscape.zoom=zoom;$('zoom-button').innerHTML=zoom?'Alejar <span>−</span>':'Acercar <span>＋</span>';$('zoom-button').setAttribute('aria-pressed',zoom);}
 function toggleAssist(){assists=!assists;$('assist-toggle').textContent='Ayudas visuales: '+(assists?'sí':'no');save();}
 function setStatus(title,description,color='#5a8068'){$('status-title').textContent=title;$('status-description').textContent=description;$('status-dot').style.background=color;}
@@ -150,17 +150,17 @@ function updateUI(){
   $('line-remaining').textContent=p.lineRemaining.toFixed(1);
   $('energy-value').textContent=Math.round(p.energy)+'%';$('energy-fill').style.width=p.energy+'%';$('energy-fill').style.background=p.energy<20?'#bd744a':p.energy<45?'#b69c57':'#64866a';$('energy-meter').setAttribute('aria-valuenow',Math.round(p.energy));
   $('energy-state').textContent=p.exhausted?'Recupera hasta 20%':p.energy>99.5?'Listo para jugar':p.action==='hold'?'Recuperando':p.boost?'Esfuerzo alto':p.action==='reel'?'Esfuerzo suave':'Respirando';
-  document.body.classList.toggle('dueling',duel.visible&&mode==='flight');document.body.classList.toggle('partying',duel.partyMode&&duel.visible);$('duel-mode-label').textContent=duel.partyMode?'PARTY':'COMISIÓN';$('duel-hud').classList.toggle('hidden',!duel.visible||mode!=='flight');
+  document.body.classList.toggle('dueling',duel.visible&&mode==='flight');document.body.classList.toggle('partying',duel.partyMode&&duel.visible);$('duel-mode-label').textContent=duel.partyMode?(duel.rules==='last-man'?'ÚLTIMO EN PIE':'PARTY'):'COMISIÓN';$('duel-hud').classList.toggle('hidden',!duel.visible||mode!=='flight');
   for(const id of ['wind-settings','flight-workshop','pause-wind','pause-workshop'])$(id).disabled=duel.active||trail.visible||!!online?.active;
   document.body.classList.toggle('trailing',trail.visible&&mode==='flight');$('trail-hud').classList.toggle('hidden',!trail.visible||mode!=='flight');updateCamera();
   if(trail.visible){$('trail-clock').textContent=trail.state==='preparing'?String(Math.max(1,Math.ceil(trail.countdown))):formatTime(trail.remaining);$('trail-state').textContent={preparing:'PREPARACIÓN',playing:'CONTRARRELOJ',finished:'TERMINADO'}[trail.state];$('trail-count').textContent=`${trail.index} / ${trail.points.length}`;$('trail-best').textContent=trailBest?formatTime(trailBest,true):'—';$('trail-bonus').textContent=p.time-trail.lastPickup<1?'¡+2 segundos!':'+2 s por captura';$('trail-hud').classList.toggle('pickup',p.time-trail.lastPickup<1);$('trail-hud').classList.toggle('urgent',trail.remaining<15);all('#trail-dots i').forEach((el,i)=>{el.classList.toggle('done',i<trail.index);el.classList.toggle('current',i===trail.index);});}
   if(duel.partyMode&&duel.visible){
-    $('party-alive').textContent=`1 vs ${duel.npcCount} · ${duel.aliveRivals.length} en juego`;
-    for(let i=0;i<4;i++){const row=$('party-player-'+i),e=duel.roster[i];row.classList.toggle('hidden',!e);if(!e)continue;row.style.setProperty('--rival',e.tint);row.classList.toggle('is-out',!e.alive);row.querySelector('strong').textContent=e.name;row.querySelector('b').textContent=e.alive?Math.ceil(e.pilot.rope.integrity)+'%':e.reason==='Hilo cortado'?'CORTADO':'EN TIERRA';row.querySelector('em').style.width=Math.max(0,e.pilot.rope.integrity)+'%';row.querySelector('small').textContent=e.alive?'Energía '+Math.round(e.pilot.energy)+'%':'Fuera de la ronda';}
+    $('party-alive').textContent=`${duel.survivors.length} de ${duel.npcCount+1} en juego`;
+    for(let i=0;i<4;i++){const row=$('party-player-'+i),e=duel.roster[i];row.classList.toggle('hidden',!e);if(!e)continue;row.style.setProperty('--rival',e.tint);row.classList.toggle('is-out',!e.alive);row.querySelector('strong').textContent=e.name;row.querySelector('b').textContent=e.alive?Math.ceil(e.pilot.rope.integrity)+'%':e.reason==='Hilo cortado'?'CORTADO':'EN TIERRA';row.querySelector('em').style.width=Math.max(0,e.pilot.rope.integrity)+'%';row.querySelector('small').textContent=e.alive?'Energía '+Math.round(e.pilot.energy)+'%'+(e.intent?' · '+e.intent:''):'Fuera de la ronda';}
     const event=duel.events.at(-1);$('party-feed').textContent=event&&duel.elapsed-event.time<7?event.text:'';
   }
   if(!online?.active){$('rival-name').textContent='Mateo · NPC';$('rival-marker').querySelector('span').textContent='MATEO · NPC';$('result-rival-name').textContent='Mateo';}
-  if(duel.visible){const sec=Math.ceil(duel.remaining);$('duel-timer').textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');$('duel-state').textContent={preparing:'PREPARACIÓN',playing:duel.contact?'EN CONTACTO':'EN JUEGO',finished:'TERMINADA'}[duel.state];$('duel-hint').textContent=duel.message;$('duel-hud').classList.toggle('in-contact',duel.contact);for(const [id,val] of [['player',duel.playerHealth],['rival',duel.rivalHealth]]){$(id+'-integrity').textContent=Math.ceil(val)+'%';$(id+'-integrity-fill').style.width=val+'%';}}
+  if(duel.visible){const sec=duel.partyMode&&duel.rules==='last-man'?Math.floor(duel.elapsed):Math.ceil(duel.remaining);$('duel-timer').textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');$('duel-state').textContent={preparing:'PREPARACIÓN',playing:duel.spectating?'ESPECTANDO':duel.contact?'EN CONTACTO':'EN JUEGO',finished:'TERMINADA'}[duel.state];$('duel-hint').textContent=duel.message;$('duel-hud').classList.toggle('in-contact',duel.contact);for(const [id,val] of [['player',duel.playerHealth],['rival',duel.rivalHealth]]){$(id+'-integrity').textContent=Math.ceil(val)+'%';$(id+'-integrity-fill').style.width=val+'%';}}
   $('contact-load').textContent=duel.contact?`Carga ${strainPercent}% · ${duel.reversals} pasadas`:duel.state==='finished'?'TERMINADO':'SIN CONTACTO';
   updateControlState();
   const pulseAge=p.time-p.lastTug,tugRecent=p.state==='flying'&&pulseAge<.65;
@@ -196,6 +196,8 @@ function updateUI(){
   $('direction-label').textContent=(p.action==='release'?'GIRA · ':'APUNTA ')+(Math.cos(p.heading)<-.35?'ABAJO':Math.sin(p.heading)>.45?'DERECHA':Math.sin(p.heading)<-.45?'IZQUIERDA':'ARRIBA');
   $('assist-toggle').textContent='Ayudas visuales: '+(assists?'sí':'no');
   $('wind-compass').querySelector('.arrow').style.transformOrigin='32px 32px';$('wind-compass').querySelector('.arrow').style.transform=`rotate(${Math.atan2(p.wind.x,-p.wind.z)*180/Math.PI}deg)`;
+  if(duel.spectating)setStatus('Tu vuelo terminó; la Party continúa.',duel.watched?`Siguiendo a ${duel.watched.name}. Arrastra para girar la cámara.`:'Vista general de los supervivientes.');
+  document.body.classList.toggle('spectating',duel.spectating);$('spectator-controls').classList.toggle('hidden',!duel.spectating||mode!=='flight');$('spectator-name').textContent=duel.watched?.name||'Todos los supervivientes';
   compactUI?.update({physics:p,duel,trail,online,audio,assists});
   if(audio){audio.gain.gain.setTargetAtTime(audio.enabled?(p.profile==='calm'?.002:clamp(p.wind.length()/1000,.002,.015)):0,audio.context.currentTime,.25);audio.filter.frequency.setTargetAtTime(260+p.wind.length()*75,audio.context.currentTime,.25);}
 }
@@ -215,6 +217,9 @@ function bindEvents(){
   for(const id of ['trail-leave','trail-free'])$(id).addEventListener('click',goFlying);
   $('trail-resume').addEventListener('click',closeModal);$('camera-button').addEventListener('click',toggleCamera);
   $('orbit-near').addEventListener('click',()=>{landscape.orbit.zoom(-100);updateCamera();});$('orbit-far').addEventListener('click',()=>{landscape.orbit.zoom(100);updateCamera();});
+  $('spectator-next').addEventListener('click',()=>{duel.spectateNext();landscape.follow=true;landscape.orbit.reset();updateUI();});
+  $('spectator-all').addEventListener('click',()=>{duel.spectatorIndex=-1;landscape.orbit.active=false;landscape.follow=true;updateUI();});
+  $('spectator-exit').addEventListener('click',leaveCommission);
   $('party-count').addEventListener('change',e=>{partyCount=clamp(Number(e.target.value),1,3);save();updatePartyRoster();});
   $('intro-party').addEventListener('click',()=>openModal('commission-modal'));
 
@@ -266,14 +271,14 @@ function bindEvents(){
   $('world').addEventListener('pointerdown',e=>{if(modal||mode!=='flight')return;compactUI?.setCameraTools(false);drag={id:e.pointerId,x:e.clientX,y:e.clientY};$('world').setPointerCapture(e.pointerId);});
   $('world').addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;landscape.drag(e.clientX-drag.x,e.clientY-drag.y);drag.x=e.clientX;drag.y=e.clientY;updateFollow();});
   for(const type of ['pointerup','pointercancel','lostpointercapture'])$('world').addEventListener(type,()=>drag=null);
-  $('world').addEventListener('wheel',e=>{if(mode!=='flight'||modal)return;e.preventDefault();if(landscape.orbit.active){landscape.orbit.zoom(e.deltaY);updateCamera();return;}const desired=e.deltaY<0;if(desired!==zoom)toggleZoom();},{passive:false});
+  $('world').addEventListener('wheel',e=>{if(mode!=='flight'||modal)return;e.preventDefault();if(landscape.orbit.active||duel.spectating&&duel.watched){landscape.orbit.zoom(e.deltaY);updateCamera();return;}const desired=e.deltaY<0;if(desired!==zoom)toggleZoom();},{passive:false});
   $('overlay').addEventListener('pointerdown',e=>{if(e.target===$('overlay'))closeModal();});
 }
 
 function frame(now){
   const dt=lastTime?Math.min((now-lastTime)/1000,.08):1/60;lastTime=now;
   if(online?.active)online.render(physics,duel);
-  if(!online?.active&&!modal&&!document.hidden){accumulator+=dt;const step=1/240;while(accumulator>=step){physics.step(step);duel.step(step);if(!duel.visible)solveRopeSystem([physics.rope],step);trail.step(step);accumulator-=step;}}
+  if(!online?.active&&!modal&&!document.hidden){accumulator+=dt;const step=1/240;while(accumulator>=step){physics.step(step);const wasSpectating=duel.spectating;duel.step(step);if(!wasSpectating&&duel.spectating){releaseAll();landscape.follow=true;landscape.orbit.active=false;landscape.orbit.reset();}if(!duel.visible)solveRopeSystem([physics.rope],step);trail.step(step);accumulator-=step;}}
   if(!online?.active&&duel.state==='finished'&&!duelRecorded){recordCommission();releaseAll();resultAt=physics.time;}
   if(!online?.active&&duel.state==='finished'&&!resultShown&&!modal&&physics.time-resultAt>2.5)showCommissionResult();
   if(trail.state==='finished'&&!trailFinishedAt){trailFinishedAt=physics.time;releaseAll();if(trail.result.won&&(!trailBest||trail.elapsed<trailBest)){trailBest=trail.elapsed;trailNewBest=true;save();}}
@@ -308,6 +313,7 @@ function frame(now){
 try{
   try{landscape=new Landscape($('world'),physics);}catch(error){console.warn('Using software perspective renderer:',error.message);landscape=new CanvasLandscape($('world'),physics);}
   landscape.duel=duel;landscape.trail=trail;
+  partyUI=new PartySettings(saved.partyOptions||{profile:physics.profile,wind:physics.windSpeed},setup,save);
   compactUI=new CompactFlightUI({open:openModal,close:closeModal,release:releaseAll,currentModal:()=>modal});
   buildWorkshop();workshopDesign=new WorkshopDesign(setup,applySetup,toast);bindEvents();updateWorkshop();updateWindSettings();updateFollow();updateUI();
 
@@ -325,7 +331,7 @@ try{
       releaseAll();setTimeout(()=>{if(!online?.active||online.latest?.round!==data.round||online.latest?.phase!=='finished')return;
       online.render(physics,duel);releaseAll();resultShown=true;const r=duel.result;
       $('result-title').textContent={win:'La comisión es tuya.',loss:'Tu rival ganó esta vez.',draw:'El cielo queda parejo.'}[r.outcome];
-      $('result-reason').textContent=physics.rope.broken>=0?'Se cortó tu hilo.':duel.rival.rope.broken>=0?'Cortaste el hilo rival.':r.reason.includes('tierra')?'La comisión terminó al tocar tierra.':r.reason.includes('abandon')?'Un jugador abandonó la sala.':r.reason;
+      $('result-reason').textContent=physics.rope.broken>=0&&physics.rope.cutReason!=='ground'?'Se cortó tu hilo.':duel.rival.rope.broken>=0&&duel.rival.rope.cutReason!=='ground'?'Cortaste el hilo rival.':r.reason.includes('tierra')?'La comisión terminó al tocar tierra.':r.reason.includes('abandon')?'Un jugador abandonó la sala.':r.reason;
       $('result-player').textContent=r.playerHealth+'%';$('result-rival').textContent=r.rivalHealth+'%';$('result-detail').textContent=`Ronda ${data.round} · ${r.seconds} segundos · ${duel.engagements} cruces`;
       openModal('result-modal');
       },2500);

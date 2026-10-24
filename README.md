@@ -1,6 +1,6 @@
 # TIRANTE · El pulso del viento
 
-Proyecto completo, versión 1.9.0, preparado para un repositorio nuevo en GitHub y un Web Service en Render.
+Proyecto completo, versión 1.10.0, preparado para un repositorio nuevo en GitHub y un Web Service en Render.
 
 ## Instalación actual en Render
 
@@ -22,6 +22,16 @@ La instalación actual usa el plan gratuito, una instancia y `DATA_DIR=/tmp/tira
 - Party local contra 1–3 NPC, Rastro de luz contrarreloj y duelo online para dos personas.
 - Interfaz compacta para móvil, renderer WebGL y alternativa Canvas.
 - Servidor Node.js, base SQLite, almacenamiento de estampados y pruebas automatizadas.
+
+## Cambios de la versión 1.10.0
+
+- Papel con 55 % de transparencia (45 % de opacidad), tanto en WebGL como en Canvas y en los estampados.
+- Party configurable: nombres de los NPC, color, diseño clásico/liso o imagen propia por rival; también puedes copiarles tu diseño. Perfil e intensidad de viento elegibles antes de jugar. Los ajustes quedan guardados en este navegador.
+- Separación inicial mínima de 6 m y preparación de 6 s. Tres veces más trabajo de roce para desgastar una hebra y el doble de exposición necesaria para cortarla por tensión en un cruce. La ráfaga rara de vuelo libre conserva su calibración.
+- NPC con decisiones de defensa, recuperación, selección de rivales vivos, pasos de aproximación y tirones cuando el contrario se acerca al límite. Nivel Hábil o Competitivo.
+- Ronda con tiempo de 180/240 s y modo **Último en pie / Last man standing**, todos contra todos, sin victoria por reloj. Party local admite un jugador y hasta tres NPC; el duelo online sigue siendo de dos personas.
+- Si te abaten y quedan dos o más participantes, la ronda continúa en modo espectador: siguiente rival, cámara orbital, vista general y salida. El resultado anuncia al ganador real de la ronda.
+- El hilo de un volantín que toca tierra se corta y se libera antes de calcular nuevas colisiones, para no bloquear a los supervivientes.
 
 ## Cambios de la versión 1.9.0
 

@@ -6,10 +6,10 @@ import {packMatch,unpackMatch,snapshot} from '../server/online-match.js';
 const dt=1/240;
 function pilot(tension=50,wear=0){const p=new KitePhysics();p.launch();p.tension=tension;p.rope.wear[Math.round(p.rope.materialAt(14,.5)/.125)]=wear;return p;}
 function crossing(a,b){return {ra:a.rope,rb:b.rope,i:14,j:14,s:.5,t:.5};}
-function run(a,b,{pull=false,seconds=.5,duplicates=1}={}){const c=crossing(a,b);for(let n=0;n<seconds/dt&&a.state==='flying'&&b.state==='flying';n++){a.rope.feedDelta=pull&&n===0?-.3:0;resolveLineStress([a.rope,b.rope],Array(duplicates).fill(c),dt);}return [a,b];}
+function run(a,b,{pull=false,seconds=.5,duplicates=1}={}){const c=crossing(a,b);for(let n=0;n<seconds/dt&&a.state==='flying'&&b.state==='flying';n++){a.rope.feedDelta=pull&&(n===0||n===53)?-.3:0;resolveLineStress([a.rope,b.rope],Array(duplicates).fill(c),dt);}return [a,b];}
 
 // The same near-limit crossing survives passive contact and fails under a
-// deliberate pull. Swapping the worn line must swap the losing player.
+// deliberate double pull. Swapping the worn line must swap the losing player.
 for(const ownWear of [false,true]){
   let a=pilot(50,ownWear?.5:0),b=pilot(50,ownWear?0:.5);run(a,b);assert.equal(a.state,'flying');assert.equal(b.state,'flying');
   a=pilot(50,ownWear?.5:0);b=pilot(50,ownWear?0:.5);const weak=ownWear?a:b,strong=ownWear?b:a,point=weak.rope.points[14].clone().lerp(weak.rope.points[15],.5);

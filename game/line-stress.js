@@ -11,12 +11,12 @@ export function extremeGust(p){
   return 1+1.55*Math.sin(Math.PI*t)**2;
 }
 export function remainingStrength(rope,edge,fraction=.5){return LINE_STRENGTH*Math.max(.12,1-.88*rope.wearAt(edge,fraction));}
-function expose(rope,load,strength,dt){
+function expose(rope,load,strength,dt,limit=.03){
   rope.stressLoad=load;rope.strength=strength;rope.stressRatio=load/strength;
   // A frame spike is not a break. Excess load must persist; releasing unloads
   // the strand and drains the exposure rather than rewarding input spam.
   rope.overload=rope.stressRatio>1?rope.overload+dt*(rope.stressRatio-1):Math.max(0,rope.overload-dt*.65);
-  return rope.overload>=.03;
+  return rope.overload>=limit;
 }
 export function updateWindStress(p,dt){
   const r=p.rope;if(r.broken>=0||p.state!=='flying'||r.contactAge<.1)return;
@@ -53,7 +53,7 @@ export function resolveLineStress(ropes,contacts,dt){
     }
   }
   const ready=[];
-  for(const [r,c]of candidates)if(expose(r,c.load,c.strength,dt))ready.push([r,c]);
+  for(const [r,c]of candidates)if(expose(r,c.load,c.strength,dt,.06))ready.push([r,c]);
   ready.sort((a,b)=>b[1].ratio-a[1].ratio);
   // The most overloaded strand in a crossing breaks first. Its release
   // unloads the partner; there is no automatic win for the initiating player.

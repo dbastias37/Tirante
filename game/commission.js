@@ -73,7 +73,7 @@ export class Commission {
     this.elapsed+=dt;this.remaining=Math.max(0,90-this.elapsed);this.controlRival(dt);b.step(dt);const physical=solveRopeSystem([p.rope,b.rope],dt)[0];
     this.playerHealth=p.rope.integrity;this.rivalHealth=b.rope.integrity;
     if(p.state!=='flying'||b.state!=='flying'){
-      const outP=p.state!=='flying',outB=b.state!=='flying',cut=p.rope.broken>=0||b.rope.broken>=0,loser=outP?p:b,why=loser.rope.cutReason==='wind'?'por una ráfaga extrema':loser.rope.cutReason==='tension'?'por exceso de tensión en el cruce':'';
+      const outP=p.state!=='flying',outB=b.state!=='flying',loser=outP?p:b,cut=loser.rope.broken>=0&&loser.rope.cutReason!=='ground',why=loser.rope.cutReason==='wind'?'por una ráfaga extrema':loser.rope.cutReason==='tension'?'por exceso de tensión en el cruce':'';
       this.finish(outP&&outB?'draw':outB?'win':'loss',outP&&outB?'Ambos volantines quedaron fuera.':cut?`${outP?'Tu hilo se cortó':'Se cortó el hilo del rival'}${why?' '+why:''}.`:outB?'El rival tocó tierra.':'Tu volantín tocó tierra.');return;
     }
     const hit=physical?.hit;this.contact=!!hit;this.sliding=0;this.pressure=0;

@@ -10,7 +10,7 @@ export function handViewOffset(camera){
   return PILOT_EYE.clone().sub(camera.position).applyQuaternion(camera.quaternion.clone().invert());
 }
 export function frameDuel(camera,duel){
-  const eye=camera.position,points=duel.partyMode?duel.roster.filter(e=>e.index===0||e.alive||duel.elapsed-e.eliminatedAt<2).map(e=>e.pilot.position):[duel.player.position,duel.rival.position];
+  const eye=camera.position,points=duel.partyMode?duel.roster.filter(e=>e.alive||(!duel.spectating&&(e.index===0||duel.elapsed-e.eliminatedAt<2))).map(e=>e.pilot.position):[duel.player.position,duel.rival.position];
   const center=points.reduce((sum,p)=>sum.add(p),new Vector3()).multiplyScalar(1/points.length);
   if(duel.contact)center.lerp(duel.contactPoint,.15);
   const forward=center.clone().sub(eye).normalize();

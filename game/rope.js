@@ -72,7 +72,7 @@ export class Tether {
     if(work<=0||this.broken>=0)return false;
     const coordinate=this.materialAt(edge,fraction)/.125,index=Math.round(coordinate);
     for(let k=Math.max(0,index-1);k<=Math.min(1200,index+1);k++){
-      const amount=work/1.2*Math.max(0,1-Math.abs(k-coordinate)/1.25);
+      const amount=work/3.6*Math.max(0,1-Math.abs(k-coordinate)/1.25);
       this.wear[k]=Math.min(1,this.wear[k]+amount);this.integrity=Math.min(this.integrity,100*(1-this.wear[k]));
     }
     return this.integrity<=.001;

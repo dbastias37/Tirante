@@ -1,5 +1,18 @@
 # Validación de la exportación
 
+## Party configurable y último en pie · 1.10.0 · 24 de octubre de 2026
+
+- `npm run build`: 50 módulos. `npm test`: suites completas y 9 pruebas HTTP/SQLite aprobadas.
+- Se verifican nombres y diseños independientes, sanitización de ajustes, persistencia de la configuración, perfil/intensidad de viento, separación mínima de 6 m y preparación de 6 s.
+- Pruebas de espectador: la eliminación del jugador no termina una ronda con varios supervivientes; el objetivo cambia al siguiente piloto vivo; la cámara general excluye al jugador abatido; la IA deja de atacarlo. Último en pie continúa incluso después de 600 s de reloj si quedan dos participantes y termina únicamente con un ganador o una eliminación simultánea.
+- Ocho partidas naturales de Último en pie (brisa/firme, Hábil/Competitivo, jugador quieto/aserruchando) terminaron con ganador. En brisa, Hábil y tres NPC, el jugador quieto pierde a los 106 s y aserruchando gana a los 103 s. La versión 1.9 resolvía esos casos a los 19 y 15 s. Son escenarios con semillas fijas, no una duración garantizada.
+- En Competitivo, el jugador pierde las cuatro muestras de brisa/firme y quieto/aserruchando: mantener F ya no asegura ganar. Se comprueban por separado la descarga defensiva, el descanso con poca energía y el tirón oportunista sin privilegios físicos.
+- El trabajo de roce que antes agotaba una hebra ahora deja más del 30 % de integridad. Un doble tirón bien situado aún puede cortar el hilo con menor margen, incluido el propio. El enredo controlado se libera en 1,19 s, y soltando permanece intacto.
+- La cuerda de un jugador aterrizado se libera una sola vez antes de las colisiones, sin bloquear ni dañar al superviviente. Los resultados online siguen distinguiendo aterrizaje y corte en el aire.
+- Opacidad real 0,45 comprobada en materiales WebGL y llamadas Canvas, incluidos los estampados; geometría, giros, contrarreloj, sincronización y persistencia siguen pasando sus regresiones.
+
+Comprobación visual y publicación: pendiente de registrar tras el despliegue.
+
 ## Cruces, tensión y ráfagas · versión 1.9.0 · 24 de octubre de 2026
 
 Validación local con Node.js 24.19.0:

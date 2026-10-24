@@ -34,7 +34,7 @@ assert.ok(checks<allPairs/5,`${checks} candidate bounds checks vs ${allPairs} al
 
 const paper=new PaperKite();paper.configure(DEFAULT_SETUP);paper.animate(1.3,.8,8);
 for(const panel of paper.panels){
- assert.equal(panel.material.opacity,.4);assert.equal(panel.material.transparent,true);assert.equal(panel.material.depthWrite,false);assert.equal(panel.material.forceSinglePass,true);
+ assert.equal(panel.material.opacity,.45);assert.equal(panel.material.transparent,true);assert.equal(panel.material.depthWrite,false);assert.equal(panel.material.forceSinglePass,true);
  const g=panel.geometry,p=g.attributes.position;let area=0;
  for(let i=0;i<g.index.count;i+=3){const a=new Vector3().fromBufferAttribute(p,g.index.getX(i)),b=new Vector3().fromBufferAttribute(p,g.index.getX(i+1)),c=new Vector3().fromBufferAttribute(p,g.index.getX(i+2));area+=Math.abs((b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x))/2;}
  assert.ok(Math.abs(area-.08)<1e-7,'Indexed panels cover the full diamond without overlapping or missing triangles');
@@ -48,7 +48,7 @@ assert.ok(FOG_NEAR>150&&HORIZON_RADIUS>300&&CAMERA_FAR>FIELD_SIZE);
 for(let i=0;i<360;i++){const angle=i*Math.PI/180;assert.ok(terrainHeight(Math.sin(angle)*150,Math.cos(angle)*150)===0);}
 assert.equal(renderPixelRatio(3,true),1.25);assert.equal(renderPixelRatio(1,true),1);
 
-// Observe actual Canvas draw calls: paper has one 40% compositing layer;
+// Observe actual Canvas draw calls: paper has one 45% compositing layer;
 // spars, bridles and contour restore normal opacity, including printed sails.
 function context(){const calls=[],stack=[];return {calls,globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},beginPath(){},moveTo(){},lineTo(){},closePath(){},arc(){},clip(){},transform(){},fillRect(){},fill(){calls.push(['fill',this.globalAlpha]);},stroke(){calls.push(['stroke',this.globalAlpha]);},drawImage(){calls.push(['image',this.globalAlpha]);}};}
 const ctx=context(),canvas=Object.create(CanvasLandscape.prototype);canvas.ctx=ctx;canvas.physics=new KitePhysics();canvas.width=800;canvas.height=600;canvas.camera=new PerspectiveCamera(50,4/3,.05,CAMERA_FAR);canvas.camera.position.set(0,0,3);canvas.camera.lookAt(0,0,0);canvas.camera.updateMatrixWorld();canvas.kiteRotation=new Quaternion();canvas.kitePosition=new Vector3();canvas.kiteScale=1;
@@ -61,4 +61,4 @@ for(const setup of [{...DEFAULT_SETUP,tail:false},{...DEFAULT_SETUP,tail:false,s
  assert.ok(ctx.calls.filter(c=>c[0]==='stroke').every(c=>c[1]===1));assert.equal(ctx.globalAlpha,1);
 }
 delete globalThis.document;
-console.log(`PASS: ordered broadphase equivalence, ${checks}/${allPairs} bounds checks for four long lines, ${vertexCount} sail vertices, complete indexed panels, 40% WebGL/Canvas/printed paper, green field geometry and flat 150 m radius.`);
+console.log(`PASS: ordered broadphase equivalence, ${checks}/${allPairs} bounds checks for four long lines, ${vertexCount} sail vertices, complete indexed panels, 45% WebGL/Canvas/printed paper, green field geometry and flat 150 m radius.`);
