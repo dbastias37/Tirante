@@ -11,7 +11,13 @@
 - La cuerda de un jugador aterrizado se libera una sola vez antes de las colisiones, sin bloquear ni dañar al superviviente. Los resultados online siguen distinguiendo aterrizaje y corte en el aire.
 - Opacidad real 0,45 comprobada en materiales WebGL y llamadas Canvas, incluidos los estampados; geometría, giros, contrarreloj, sincronización y persistencia siguen pasando sus regresiones.
 
-Comprobación visual y publicación: pendiente de registrar tras el despliegue.
+Los commits de implementación `bbc52a5` y `5d824b1` llegaron a `live` en Render. En la web se guardaron Luna, Sol y Sur como nombres de rivales y se verificaron después de recargar, junto con Último en pie, perfil de brisa e intensidad de 5,5 m/s. Se cargó un PNG sintético desde el selector de archivos: apareció «Estampado listo» y la vista previa. También se comprobó el diseño de color liso.
+
+En una ronda real de Último en pie, el jugador aterrizó y quedaron tres NPC compitiendo. La interfaz cambió a «ESPECTANDO», ocultó los mandos del jugador y el reloj avanzó de 00:14 a 00:19. «Siguiente rival» cambió de Luna a Sol, «Ver todos» volvió a los supervivientes y el zoom orbital pasó de 6,0 a 7,3 m. Otra ronda terminó mostrando un único superviviente. Las etiquetas sobre los volantines se vincularon al nombre elegido, además de los nombres del marcador y los resultados.
+
+La comprobación visual usa Canvas porque el navegador disponible no ofrece WebGL. Los materiales 3D se comprueban en las pruebas, pero no se ha medido FPS en una GPU real. La instalación gratuita conserva la limitación ya documentada de almacenamiento temporal de estampados.
+
+![Configuración de Party con nombres, viento, diseños y Último en pie](tirante-1-10-party.jpg)
 
 ## Cruces, tensión y ráfagas · versión 1.9.0 · 24 de octubre de 2026
 

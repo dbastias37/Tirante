@@ -296,6 +296,7 @@ function frame(now){
   for(let i=0;i<3;i++){
     const el=$('party-marker-'+i),e=duel.roster[i+1],point=marker.rivals?.[i],visible=mode==='flight'&&duel.partyMode&&duel.visible&&e?.alive&&point?.visible;el.classList.toggle('hidden',!visible);
     if(visible){
+      const label=el.querySelector('span'),name=e.name.toUpperCase();if(label.textContent!==name)label.textContent=name;
       el.style.left=point.x+'px';el.style.top=(point.y-35)+'px';el.style.setProperty('--rival',e.tint);
       // Keep each diamond attached to its kite; only move a colliding name tag.
       const base=clamp(point.x,42,innerWidth-42);
