@@ -7,7 +7,7 @@ Validación local con Node.js 24.19.0:
 - `npm run build`: 43 módulos comprobados. `npm test`: todas las suites y las 9 pruebas de integración HTTP/SQLite aprobadas.
 - Se compararon los candidatos de colisión y su orden contra una búsqueda exhaustiva, con 50 escenas deterministas, 1–4 hilos, movimiento barrido, diferentes radios, fracturas y cambios de orden. En cuatro hilos largos separados se reducen las comprobaciones de límites de 6.216 a 600.
 - Siguen pasando los cruces rápidos, contactos tangentes, autoenredos, desgaste y fracturas; la prueba de Party inspecciona 827.631 pares de segmentos. La interpolación visual también conserva la separación y libera el hilo cuando el servidor confirma un corte.
-- Se verifica la continuidad de volantín, hilo y animación del papel al recibir un paquete antes de acabar la transición anterior, desde ambos asientos. Cambiar de sala o de ronda descarta la transición anterior.
+- Se verifica la continuidad de volantín, hilo y animación del papel al recibir un paquete antes de acabar la transición anterior, desde ambos asientos. Cambiar de sala o de ronda descarta la transición anterior. Una prueba adicional reproduce un fotograma por paquete: las pestañas lentas o en segundo plano recuperan la posición en vez de reiniciar siempre la interpolación desde cero.
 - Se inspeccionan los materiales y la geometría real de Three.js sin GPU: opacidad 0,4, transparencia en una pasada, paneles completos sin triángulos superpuestos, UV continuas, 112 vértices por vela y normales finitas. Las llamadas de dibujo de Canvas comprueban el 40 % en papel clásico, liso y estampado, sin acumular dos capas de opacidad.
 - El terreno mide 800 × 800 m, con 8.192 triángulos en vez de 20.000, y no contiene instancias de pasto ni flores. El radio de 150 m permanece plano; los árboles empiezan a 210 m, las montañas a 360 m y la niebla a 190 m. La distancia de cámara aumenta a 1.200 m.
 - Con la misma configuración de vuelo y soltando tras 8 segundos, la primera vuelta pasa de 2,1625 s a 2,0125 s. Las pruebas de vuelo estable, recuperación y picada siguen aprobadas. El recorrido original de contrarreloj se completa en 30,83 s con soltadas algo más cortas; sus puntos, radios y medallas no se alteraron.
@@ -20,6 +20,10 @@ Microcomparación local contra `d97f928` (mediana de cinco ejecuciones de 1.800 
 | Comprobación del movimiento de cuatro hilos largos separados | 79,50 ms | 26,49 ms |
 
 Son mediciones de funciones aisladas, no FPS del juego ni garantías para todos los dispositivos. La comprobación visual en el navegador disponible usa el renderer Canvas porque ese entorno no ofrece WebGL; no se ha medido rendimiento en una GPU real.
+
+Comprobación en Render: los commits de implementación `f66eee7` y `a34b392` llegaron a `live`; `/healthz` devuelve la versión 1.8.0. Los módulos publicados se compararon byte por byte con el repositorio. Se probó vuelo libre con carrete de 150 m, cámara orbital y dos sesiones de navegador en una sala de 150 m. Tras alternar pestañas, ambos asientos mostraron 8,5 m de altura y el reloj 01:13; un tirón redujo el hilo de 8,0 a 7,7 m. Se cerraron los dos asientos de prueba. La consulta de registros de error del servicio no devolvió errores durante la verificación.
+
+![Vuelo libre con suelo verde, carrete de 150 m y papel translúcido](tirante-1-8-vuelo.jpg)
 
 ## Reparación de Render · 24 de octubre de 2026
 
