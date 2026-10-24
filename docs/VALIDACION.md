@@ -13,7 +13,13 @@ Validación local con Node.js 24.19.0:
 - Con la misma semilla de ráfaga, soltar rápido con boost conserva la hebra que se corta al mantenerla tensa. Esa defensa no garantiza seguir en el aire: el giro todavía puede llevar el volantín al suelo.
 - El estado de sobrecarga y el resultado permanecen iguales tras guardar/restaurar la simulación; ambos asientos reciben la misma carga y causa del corte. Se mantienen las pruebas de reconexión y continuidad visual online.
 
-Repetir: `npm run build && npm test`, y `npm run test:wind` para la muestra extensa de viento. La comprobación en navegador y despliegue se registra después de publicar esta versión.
+Repetir: `npm run build && npm test`, y `npm run test:wind` para la muestra extensa de viento.
+
+El commit `8a59be9` llegó a `live` en Render. `/healthz` respondió con versión 1.9.0 y los diez archivos de cliente modificados coincidieron byte por byte con el repositorio. En navegador se jugó Party de cuatro volantines: se realizaron tirones, recogida con boost y aserruchado, el hilo pasó de 8,0 a 7,2 m, se eliminaron dos NPC y la partida continuó con el rival restante. La barra y el detalle de cruce muestran el porcentaje de carga. La captura siguiente usa Canvas, porque el navegador de comprobación no dispone de WebGL; no representa una medición de FPS en GPU.
+
+En una sala online de 150 m con viento firme de 9 m/s, dos pestañas mostraron simultáneamente 01:24, 8,6 m de altura y 22 % del límite. Después de un tirón y recogida con boost del primer asiento, ambos mostraron 01:17: el primer hilo tenía 7,1 m y el segundo conservaba 8,0 m. Se cerraron ambos asientos. Render no devolvió registros de error durante esta comprobación.
+
+![Party 1.9 después de maniobras y dos eliminaciones](tirante-1-9-batalla.jpg)
 
 ## Rendimiento y vuelo · versión 1.8.0 · 24 de octubre de 2026
 
