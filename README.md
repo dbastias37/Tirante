@@ -2,6 +2,14 @@
 
 Proyecto completo, versión 1.7.0, preparado para un repositorio nuevo en GitHub y un Web Service en Render.
 
+## Instalación actual en Render
+
+El simulador completo se sirve desde **https://tirante-vuelo.onrender.com** mediante el Web Service `tirante-vuelo`, conectado a `main` de este repositorio con despliegue automático. El servicio ejecuta `npm ci && npm run build` y después `npm start`.
+
+El enlace anterior, **https://tirante.onrender.com**, corresponde a un Static Site. Su `index.html` de la raíz redirige al Web Service y conserva los parámetros y las invitaciones `#sala=...`. La entrada real del juego es `game/index.html`, que publica el servidor Node. No copies ese archivo a la raíz: sus recursos están dentro de `game/`, y un Static Site no ejecuta las API de salas o estampados.
+
+La instalación actual usa el plan gratuito, una instancia y `DATA_DIR=/tmp/tirante-data`. Puede tardar en despertar después de estar inactiva. Las salas y las imágenes subidas al servidor se pierden cuando Render reinicia, redespliega o suspende la instancia. Los archivos Blueprint de abajo siguen siendo plantillas opcionales; no administran esta instalación creada directamente en Render.
+
 **Empieza por [INSTRUCCIONES_RENDER.md](INSTRUCCIONES_RENDER.md)**: explica cómo subir los archivos y elegir entre guardado persistente y una prueba gratuita.
 
 ## Qué incluye

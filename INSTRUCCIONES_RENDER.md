@@ -1,5 +1,15 @@
 # De este ZIP a GitHub y Render
 
+## Servicio ya configurado
+
+El repositorio `dbastias37/Tirante` está conectado al Web Service **tirante-vuelo** en **https://tirante-vuelo.onrender.com**. Para continuar trabajando, sube tus cambios a `main`: Render los despliega automáticamente. No necesitas crear otro servicio.
+
+**https://tirante.onrender.com** se conserva como acceso al nuevo servicio mediante el `index.html` de la raíz. Ese archivo mantiene los parámetros de la URL y las invitaciones a salas. El servidor Node entrega el juego desde `game/index.html`.
+
+El fallo original era publicar la raíz como **Static Site**: `app.js` y `style.css` devolvían 404, y las rutas `/api/pvp`, `/api/prints` y `/healthz` no tenían un servidor ejecutándose. Cambiar solamente la carpeta publicada a `game` permite mostrar el juego, pero no habilita las funciones del servidor. Usa **Web Service** para la instalación completa.
+
+El servicio actual es gratuito y guarda los datos en `/tmp/tirante-data`; no tiene un disco permanente. Los Blueprint de las siguientes secciones son opciones para instalaciones futuras, no la configuración activa de este servicio.
+
 ## 1. Extraer el proyecto
 
 Descomprime el ZIP y abre `tirante-github-render`. Allí deben estar `package.json`, `README.md`, `render.yaml`, `game/` y `server/`.
