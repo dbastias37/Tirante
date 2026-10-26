@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {rasterTriangle} from '../game/software-raster.js';
 import {KitePhysics,DEFAULT_SETUP} from '../game/physics.js';
 import {THREADS,REELS,BEARINGS,cleanEquipment,equipmentStats,DEFAULT_EQUIPMENT} from '../game/equipment.js';
 import {createThreadModel,createReelModel,createBearingModel,disposeModel} from '../game/equipment-models.js';
@@ -42,4 +43,12 @@ fixture.cutLine();Landscape.prototype.updateTether.call(scene,rendered,fixture);
 assert.ok([...rendered.userData.ribbon.geometry.attributes.position.array].every(Number.isFinite));
 for(const e of party.roster)e.alive=false;const emptyBattle=frameDuel(camera,party);assert.ok(Number.isFinite(emptyBattle.target.length()+emptyBattle.fov),'Finished battles keep a valid spectator camera');
 
+
+const pixels={width:32,height:32,data:new Uint8ClampedArray(32*32*4),depth:new Float32Array(32*32)};pixels.depth.fill(Infinity);
+const triangle=z=>[{x:1,y:1,z},{x:30,y:1,z},{x:1,y:30,z}];
+rasterTriangle(pixels,...triangle(.2),[220,0,0]);rasterTriangle(pixels,...triangle(.7),[0,220,0]);
+assert.deepEqual([...pixels.data.slice((4*32+4)*4,(4*32+4)*4+4)],[220,0,0,255],'Near surfaces survive later rear triangles');
+pixels.data.fill(0);pixels.depth.fill(Infinity);rasterTriangle(pixels,...triangle(.7),[0,220,0]);rasterTriangle(pixels,...triangle(.2).reverse(),[220,0,0]);
+assert.deepEqual([...pixels.data.slice((4*32+4)*4,(4*32+4)*4+4)],[220,0,0,255],'Occlusion is independent of face order and winding');
+assert.equal(pixels.data[(31*32+31)*4+3],0,'Empty space stays transparent');
 console.log('PASS: wind-driven flutter/glide/dive, landing and timestep stability, live equipment tradeoffs, online persistence, fair NPC equipment, cut/onboard/battle cameras, articulated tail inertia/pause and single-draw 3D models with open holes.');
