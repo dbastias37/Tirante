@@ -1,5 +1,19 @@
 # Validación de la exportación
 
+
+## Inicio, carrete y unidades · 1.12.0 · 26 de octubre de 2026
+
+- `npm run build`: 64 módulos comprobados. `npm test`: batería completa aprobada, incluidos física, hilos, cruces, Party, equipo, espectador, persistencia online y nueve pruebas del servidor.
+- `tests/game-flow.mjs`: título/menús/selección/preparación, ninguna partida iniciada por editar, botón de inicio para los cinco modos, IDs únicos, conversiones yd/m, viewport del carrete dentro de seis tamaños de pantalla, restauración del viewport WebGL y anclaje inalterado.
+- Rayos sobre puntos interiores y exteriores del terreno: una sola superficie de suelo por punto. Borde exterior a altura cero. La escena de primera persona contiene únicamente el carrete, sin mano.
+- Corte: posición continua y dirección conservada, límite inicial de 8 m/s, incremento lateral máximo de 4 m/s². Se mantienen las regresiones de vuelo ligero, orientación de picada, diferencias por viento y masa, aterrizaje y convergencia al cambiar el paso.
+- Navegación en la web publicada: Enter → menú → configuración → modos → preparación. Taller, equipo y viento regresan a preparación sin comenzar. Cambio a carrete de 8 pulgadas y capacidad de 164,0 yd (150,0 m), con resumen correcto.
+- Inicio real de vuelo libre, Party con dos NPC competitivos, Último en pie y Rastro. Rastro mantiene equipo, viento y longitud fijos y permite cambiar el diseño. El menú permite volver a elegir un modo.
+- Online: condiciones desde preparación y desde el lobby; guardado vuelve a la pantalla correspondiente. Sala creada con 109,4 yd (100,0 m), después abandonada y regreso al menú. Los duelos de dos clientes siguen cubiertos por pruebas automatizadas del servidor; esta revisión web no jugó una ronda con dos humanos.
+- Contador: cifra principal de 22 px y equivalencia en metros de 10 px. Capturas reales: [preparación](tirante-1-12-preparacion.jpg) y [primera persona sin mano](tirante-1-12-carrete.jpg).
+
+La sesión de navegador tiene WebGL deshabilitado y activa Canvas. No hubo errores de la aplicación durante el recorrido, aparte del aviso esperado al usar ese renderer. La geometría, los materiales y el viewport de WebGL se verificaron por pruebas; queda sin comprobar visualmente en una GPU real el parpadeo del terreno. `/healthz` confirmó 1.12.0 y Render publicó el commit `1413dbfb2febc6cc61a4b14da989eeb516a6210a` antes de la revisión web.
+
 ## Planeo, cola y equipo · 1.11.0 · 26 de octubre de 2026
 
 - Pruebas de caída desde 20 m: viento de 0, 5,5, 9 y 12 m/s, orientación de salida y masas de 22, 34 y 70 g. La deriva aumenta con el viento; la picada inicial desciende más que la orientación horizontal; todos los estados permanecen finitos y terminan en tierra. Con el peso por defecto, las muestras de salida nivelada tardan aproximadamente 14–16 s en caer. Son escenarios deterministas, no una duración universal.
