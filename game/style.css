@@ -361,3 +361,5 @@
 /* Mode selection lives in the main menu; the pause menu stays focused. */
 #pause-online,#pause-trail,#pause-commission{display:none}
 #online-settings-modal .online-settings{margin:22px 0 18px}#online-settings-done{margin-top:24px}
+
+.party-player.is-respawning{opacity:.72}.party-player.is-respawning small{color:#9a673e}.party-player b{white-space:nowrap}

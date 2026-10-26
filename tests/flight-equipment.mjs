@@ -34,12 +34,12 @@ for(const [list,factory] of [[THREADS,createThreadModel],[REELS,createReelModel]
 
 // Width changes without moving the physical rope, including after a fracture.
 const geometry=n=>new BufferGeometry().setAttribute('position',new Float32BufferAttribute(new Float32Array(n*3),3)).setAttribute('color',new Float32BufferAttribute(new Float32Array(n*3),3));
-const rendered=new Mesh(geometry(80));rendered.userData.fray=new Mesh(geometry(120));rendered.userData.tips=new Mesh(geometry(2));rendered.userData.ribbon=new Mesh(geometry(240));
+const rendered=new Mesh(geometry(1920));rendered.userData.fray=new Mesh(geometry(120));rendered.userData.tips=new Mesh(geometry(2));rendered.userData.ribbon=new Mesh(geometry(5760));
 const fixture=new KitePhysics();fixture.launch();for(let i=0;i<fixture.rope.points.length;i++)fixture.rope.points[i].set(0,2+i*.2,-2-i);
 const scene={physics:fixture,_temp:new Vector3(),camera,height:900};camera.position.set(2,2,2);camera.fov=65;
 const drawWidth=id=>{fixture.configure({...fixture.setup,lineType:id});Landscape.prototype.updateTether.call(scene,rendered,fixture);const a=rendered.userData.ribbon.geometry.attributes.position;return new Vector3().fromBufferAttribute(a,0).distanceTo(new Vector3().fromBufferAttribute(a,1));};
 assert.ok(Math.abs(drawWidth('cotton-4')/drawWidth('cotton-24')-.65/.35)<1e-4,'The visible line uses the selected diameter');
-fixture.cutLine();Landscape.prototype.updateTether.call(scene,rendered,fixture);assert.equal(rendered.userData.ribbon.geometry.drawRange.count,(fixture.rope.points.length-2)*6,'No ribbon bridges the cut');
+fixture.cutLine();Landscape.prototype.updateTether.call(scene,rendered,fixture);assert.equal(rendered.userData.ribbon.geometry.drawRange.count,(fixture.rope.points.length-2)*3*6,'No ribbon bridges the cut');
 assert.ok([...rendered.userData.ribbon.geometry.attributes.position.array].every(Number.isFinite));
 for(const e of party.roster)e.alive=false;const emptyBattle=frameDuel(camera,party);assert.ok(Number.isFinite(emptyBattle.target.length()+emptyBattle.fov),'Finished battles keep a valid spectator camera');
 

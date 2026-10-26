@@ -22,6 +22,10 @@ for(const slot of [0,1]){
  client.latest=make(3,2);client.latest.code='IJKLMNPQ';client.render(view.player,view,170);assert.ok(Math.abs(view.player.position.y-initial.y-3)<1e-7,'A new room cannot blend into the old one');
  // One frame per packet used to reset interpolation to zero indefinitely.
  for(let frame=1;frame<=4;frame++){client.latest=make(frame+3,2);client.latest.code='IJKLMNPQ';client.render(view.player,view,170+frame*1000);assert.ok(Math.abs(view.player.position.y-initial.y-frame-3)<1e-7,'A throttled tab must catch up instead of freezing at every packet');}
+ // Even if the packet containing the cut was missed, a fresh life must not
+ // sweep its new line through the previous kite's airborne location.
+ client.latest=make(0,2);client.latest.code='IJKLMNPQ';client.latest.match.pilots[slot].body.lifeSerial++;
+ client.render(view.player,view,4175);assert.ok(view.player.position.distanceTo(initial)<1e-7,'A new life starts at its launch, without interpolation from the old sail');assert.ok(view.player.rope.previous.every((q,i)=>q.distanceTo(view.player.rope.points[i])<1e-8));
 }
 console.log('PASS: jitter-free packet retargeting for both seats, line continuity, smooth paper animation, room/round resets and background-tab catch-up.');
 

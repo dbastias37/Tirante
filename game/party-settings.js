@@ -5,13 +5,15 @@ const $=id=>document.getElementById(id);
 const node=(tag,text)=>{const el=document.createElement(tag);if(text)el.textContent=text;return el;};
 export class PartySettings{
   constructor(saved,player,save){this.value=cleanPartyOptions(saved);this.player=player;this.save=save;this.busy=0;this.locked=false;
-    for(const [id,key]of[['party-rules','rules'],['party-wind','profile'],['party-strength','wind']]){
-      $(id).value=this.value[key];$(id).addEventListener('change',()=>{this.value[key]=key==='wind'?Number($(id).value):$(id).value;this.save();this.rulesLabel();});
+    for(const [id,key]of[['party-rules','rules'],['party-wind','profile'],['party-strength','wind'],['party-lives','lives']]){
+      $(id).value=this.value[key];$(id).addEventListener('change',()=>{this.value[key]=['wind','lives'].includes(key)?Number($(id).value):$(id).value;this.rulesLabel();this.save();});
     }
   }
   rulesLabel(){
+    if(this.value.rules!=='last-man')this.value.lives=3;
+    $('party-lives').value=this.value.lives;$('party-lives').disabled=this.locked||this.value.rules!=='last-man';
     $('party-duration').textContent=this.value.rules==='last-man'?'Sin límite de tiempo':`${this.count===1?180:240} segundos`;
-    $('party-rule-note').textContent=this.value.rules==='last-man'?'Último en pie: todos contra todos, sin victoria por reloj. Si te abaten, puedes mirar a los supervivientes hasta conocer al ganador.':'Ronda con tiempo: gana el último en el aire o el hilo más entero al acabar. Si te abaten, puedes seguir como espectador.';
+    $('party-rule-note').textContent=`${this.value.lives} vidas por participante. Cada corte o caída consume una; vuelves a elevar en 6 segundos. `+(this.value.rules==='last-man'?'Último en pie: gana quien conserve vidas, sin límite de tiempo.':'Al acabar el tiempo gana quien tenga más vidas; desempata el estado del hilo.')+' Sin vidas, puedes seguir como espectador.';
   }
   render(count,locked=false){this.count=count;this.locked=locked;this.rulesLabel();
     for(const id of ['party-rules','party-wind','party-strength'])$(id).disabled=locked;

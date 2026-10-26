@@ -5,6 +5,7 @@ import {LINE_STRENGTH} from './line-stress.js';
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const V=()=>new Vector3();
 export const ROPE_SEGMENTS=28,CONTACT_RADIUS=.008;
+export const ROPE_DRAW_SEGMENTS=320;
 
 // Finite 3-D segments. Parameters refer to the material's two mesh edges.
 export function closestSegments(a,b,c,d){
@@ -40,13 +41,17 @@ export class Tether {
       for(let k=0;k<this.rest.length;k++){
         const i=pass%2?this.rest.length-1-k:k;if(i===this.broken)continue;
         const a=x[i],b=x[i+1],dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z,len=Math.hypot(dx,dy,dz);if(len<1e-9)continue;
-        const change=(-(len-this.rest[i])-alpha*this.lambda[i])/(w[i]+w[i+1]+alpha);this.lambda[i]+=change;
+        const delta=(-(len-this.rest[i])-alpha*this.lambda[i])/(w[i]+w[i+1]+alpha);
+        // A loose thread can pull, but cannot push its neighbours apart like
+        // a rod. Compression disappears after a cut, including on the ground.
+        const next=this.broken>=0?Math.min(0,this.lambda[i]+delta):this.lambda[i]+delta;
+        const change=next-this.lambda[i];this.lambda[i]=next;
         const f=change/len;a.x-=w[i]*f*dx;a.y-=w[i]*f*dy;a.z-=w[i]*f*dz;b.x+=w[i+1]*f*dx;b.y+=w[i+1]*f*dy;b.z+=w[i+1]*f*dz;
       }
       for(let i=1;i<x.length-1;i++)x[i].y=Math.max(.035,x[i].y);
     }
   }
-  commitVelocities(){for(let i=1;i<this.points.length-1;i++){const v=this.velocities[i].subVectors(this.points[i],this.previous[i]).multiplyScalar(1/this.dt);if(v.lengthSq()>900)v.setLength(30);}}
+  commitVelocities(){for(let i=1;i<this.points.length-1;i++){const v=this.velocities[i].subVectors(this.points[i],this.previous[i]).multiplyScalar(1/this.dt);if(v.lengthSq()>900)v.setLength(30);if(this.broken>=0&&this.points[i].y<=.0351){v.y=Math.max(0,v.y);v.x*=Math.exp(-this.dt*14);v.z*=Math.exp(-this.dt*14);}}}
   step(dt){
     this.dt=dt;const p=this.owner;this.contactAge+=dt;this.breakAge+=dt;this.contactLoad*=Math.exp(-dt*15);
     if(this.contactAge>.08)this.contactEdge=-1;
@@ -89,6 +94,18 @@ export class Tether {
     this.velocities.splice(edge+1,0,velocity.clone().addScaledVector(dir,-recoil),velocity.clone().addScaledVector(dir,recoil));
     this.weights.splice(edge+1,0,1,1);this.rest.splice(edge,1,rest*fraction,0,rest*(1-fraction));this.lambda=Array(this.rest.length).fill(0);
     this.broken=edge+1;this.breakPoint=point;this.breakAge=0;this.contactEdge=-1;this.contactLoad=0;this.integrity=0;
+    this.refineLooseStrands();
+  }
+  refineLooseStrands(){
+    // Only detached chains get more joints: they no longer enter the expensive
+    // contact solver. Preserve the exact cut and both independently moving tips.
+    const spacing=Math.max(.35,this.rest.reduce((a,b)=>a+b,0)/250),points=[this.points[0].clone()],velocities=[this.velocities[0].clone()],rest=[];let broken=-1;
+    for(let i=0;i<this.rest.length;i++){
+      const n=i===this.broken?1:Math.max(1,Math.ceil(this.rest[i]/spacing));
+      if(i===this.broken)broken=rest.length;
+      for(let j=1;j<=n;j++){points.push(this.points[i].clone().lerp(this.points[i+1],j/n));velocities.push(this.velocities[i].clone().lerp(this.velocities[i+1],j/n));rest.push(this.rest[i]/n);}
+    }
+    this.points=points;this.previous=points.map(q=>q.clone());this.velocities=velocities;this.rest=rest;this.lambda=rest.map(()=>0);this.broken=broken;this.weights=points.map((_,i)=>i===0||i===points.length-1?0:1);
   }
 }
 

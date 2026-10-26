@@ -57,5 +57,5 @@ for(let n=0;n<120;n++)for(const match of [d,resumed])resolveLineStress([match.pl
 assert.deepEqual(JSON.parse(JSON.stringify(packMatch(d))),JSON.parse(JSON.stringify(packMatch(resumed))));
 const room={code:'STRESS00',round:1,settings:{},players:[{name:'A',seq:1,tugSeq:0,lastSeen:0},{name:'B',seq:1,tugSeq:0,lastSeen:0}],match:packMatch(d)};
 assert.deepEqual(snapshot(room,0,0).match,snapshot(room,1,0).match,'Both seats see the same strain and cut reason');
-d.player.cutLine(14,.5,'tension');d.state='playing';d.rival.state='flying';d.controlRival=()=>{};d.step(dt);assert.equal(d.result.outcome,'loss');assert.match(d.result.reason,/tensión/);assert.equal(d.playerHealth,0);
+d.player.cutLine(14,.5,'tension');d.state='playing';d.rival.state='flying';d.controlRival=()=>{};d.step(dt);assert.equal(d.result,null);assert.equal(d.player.lives,2);assert.equal(d.player.rope.cutReason,'tension');assert.equal(d.playerHealth,0);
 console.log(`PASS: tug technique, own-line risk, load priority, symmetric ties, no remote cuts, transient recovery, snag relief in ${jam.seconds.toFixed(2)} s, seeded gust ${eligible}/10000, payout rescue and authoritative persistence.`);

@@ -4,6 +4,7 @@ import {mountSettings} from '../game/kite-shape.js';
 import {KitePhysics,DEFAULT_SETUP,clamp} from '../game/physics.js';
 import {Commission} from '../game/commission.js';
 import {mixSeed} from '../game/line-stress.js';
+import {PILOT_SPACING,climbControls} from '../game/battle-rules.js';
 import {Vector3,Quaternion} from '../game/vendor/three.module.js';
 
 export const STEP=1/240, STALE_MS=3500, GRACE_MS=25000;
@@ -43,7 +44,7 @@ export function createMatch(room){
   const p=new KitePhysics(room.players[0].setup,{seed}),duel=disableAI(new Commission(p));
   p.profile=room.settings.profile;p.windSpeed=room.settings.wind;p.lineCapacity=room.settings.capacity;
   duel.rival.configure(room.players[1].setup);duel.start();
-  for(const [i,k] of [p,duel.rival].entries()){k.anchor.set(i?1.2:-1.2,1.35,0);k.launch();k.time=0;k.spinSign=i?-1:1;}
+  for(const [i,k] of [p,duel.rival].entries()){k.anchor.set((i?1:-1)*PILOT_SPACING/2,1.35,0);k.launch();k.time=0;k.spinSign=i?-1:1;}
   return duel;
 }
 export function packMatch(duel){return {pilots:[packPilot(duel.player),packPilot(duel.rival)],duel:packObject(duel,['player','rival','playerStroke','rivalStroke','lastHit','result']),strokes:[packObject(duel.playerStroke),packObject(duel.rivalStroke)],lastHit:duel.lastHit?{i:duel.lastHit.i,j:duel.lastHit.j,s:duel.lastHit.s,t:duel.lastHit.t}:null,result:duel.result};}
@@ -77,11 +78,12 @@ export function advance(room,now){
   const d=unpackMatch(room.match),ps=[d.player,d.rival];
   while(room.carry>=STEP){
     for(let i=0;i<2;i++){
-      const seat=room.players[i],p=ps[i],input=d.state==='playing'&&now-seat.lastSeen<700?seat.input:idleInput();
-      p.sawing=input.saw;p.setControls(input.action,input.boost);
-      if(d.state==='playing'){
+      const seat=room.players[i],p=ps[i],input=d.state==='playing'&&!p.eliminated&&now-seat.lastSeen<700?seat.input:idleInput();
+      if(d.state==='preparing')climbControls(p,d.elapsed);else{p.sawing=input.saw;p.setControls(input.action,input.boost);}
+      if(p.eliminated)seat.pendingTug=false;
+      if(d.state==='playing'&&!p.eliminated){
         const norm=Math.max(1,Math.hypot(input.x,input.z)),pace=(p.energy>5?.7:.3)*STEP;
-        p.anchor.x=clamp(p.anchor.x+input.x/norm*pace,(i?1.2:-1.2)-.8,(i?1.2:-1.2)+.8);p.anchor.z=clamp(p.anchor.z+input.z/norm*pace,-3,3);
+        const home=(i?1:-1)*PILOT_SPACING/2;p.anchor.x=clamp(p.anchor.x+input.x/norm*pace,home-3,home+3);p.anchor.z=clamp(p.anchor.z+input.z/norm*pace,-3,3);
         p.energy=Math.max(0,p.energy-Math.hypot(input.x,input.z)*STEP);
         if(seat.pendingTug){p.tug(seat.pendingTug.double);seat.pendingTug=false;}
       }

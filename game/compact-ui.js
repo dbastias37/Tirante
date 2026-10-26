@@ -68,9 +68,9 @@ export class CompactFlightUI {
       this.$('compact-round-detail').textContent = trail.state === 'preparing' ? 'Prepárate' : this.$('trail-bonus').textContent;
       round.classList.toggle('urgent', trail.remaining < 15);
     } else if (duel.visible) {
-      this.$('compact-round-label').textContent = duel.partyMode ? `${duel.spectating?'Espectador':duel.rules==='last-man'?'Último en pie':'Party'} · ${duel.survivors.length}` : 'Duelo online';
+      this.$('compact-round-label').textContent = duel.partyMode ? `${duel.spectating?'Espectador':duel.rules==='last-man'?'Último en pie':'Party'} · ${duel.contenders.length}` : 'Duelo online';
       this.$('compact-round-clock').textContent = this.$('duel-timer').textContent;
-      this.$('compact-round-detail').textContent = duel.spectating?`Siguiendo: ${duel.watched?.name||'todos'}`:`Tu hilo ${Math.ceil(duel.playerHealth)}%${duel.contact ? ` · Carga ${Math.round((p.rope.stressRatio||0)*100)}%` : ''}`;
+      this.$('compact-round-detail').textContent = p.eliminated&&p.lives>0?`Vuelves en ${Math.max(1,Math.ceil(p.respawnAt-duel.elapsed))} s · ${p.lives} vidas`:duel.spectating?`Siguiendo: ${duel.watched?.name||'todos'}`:`${p.lives??3} vidas · Hilo ${Math.ceil(duel.playerHealth)}%${duel.contact ? ` · Carga ${Math.round((p.rope.stressRatio||0)*100)}%` : ''}`;
       round.classList.toggle('urgent', duel.playerHealth < 25 || p.rope.stressRatio > .8);
     }
   }

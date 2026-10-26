@@ -73,14 +73,14 @@ function showFront(page='menu'){leaveCommission();setMode('intro');flow.show(pag
 function beginPreparation(choice){showFront('modes');flow.select(choice);}
 function chooseGameMode(choice){
   if(online?.active){online.leave();duel.stop();physics.networkControlled=false;duel.rival.networkControlled=false;physics.anchor.set(0,1.35,0);physics.configure(setup);physics.reset();landscape.configure(setup);}
-  if(['party','last-man'].includes(choice)){partyUI.value.rules=choice==='last-man'?'last-man':'timed';$('party-rules').value=partyUI.value.rules;}
+  if(['party','last-man'].includes(choice)){partyUI.value.rules=choice==='last-man'?'last-man':'timed';if(choice==='party')partyUI.value.lives=3;$('party-rules').value=partyUI.value.rules;}
   if(choice==='online')$('online-capacity').value=physics.lineCapacity;
   save();
 }
 function preparationSnapshot(choice){
   const fixed=choice==='trail',party=['party','last-man'].includes(choice),net=choice==='online';
   const profile=fixed?'breeze':party?partyUI.value.profile:net?$('online-wind').value:physics.profile;
-  return {setup:fixed?{...DEFAULT_SETUP,...appearance(setup)}:setup,fixed,capacity:fixed?65:net?Number($('online-capacity').value):physics.lineCapacity,wind:fixed?5.5:party?partyUI.value.wind:net?Number($('online-strength').value):physics.profile==='calm'?0:physics.windSpeed,weather:{breeze:'Brisa constante',gusts:'Entre ráfagas',strong:'Viento firme',calm:'En calma'}[profile],opponents:party?`${partyCount} rivales · ${partyUI.value.npcs.slice(0,partyCount).map(n=>n.name).join(', ')} · ${$('npc-level').value==='hard'?'Competitivo':'Hábil'}`:net?'Rival humano · el anfitrión elige las condiciones':fixed?'8 destellos · 90 segundos · equipo equilibrado':'Un vuelo sin rivales ni límite de tiempo',audio:!!audio?.enabled,assists};
+  return {setup:fixed?{...DEFAULT_SETUP,...appearance(setup)}:setup,fixed,capacity:fixed?65:net?Number($('online-capacity').value):physics.lineCapacity,wind:fixed?5.5:party?partyUI.value.wind:net?Number($('online-strength').value):physics.profile==='calm'?0:physics.windSpeed,weather:{breeze:'Brisa constante',gusts:'Entre ráfagas',strong:'Viento firme',calm:'En calma'}[profile],opponents:party?`${partyUI.value.lives} vidas · ${partyCount} rivales · ${partyUI.value.npcs.slice(0,partyCount).map(n=>n.name).join(', ')} · ${$('npc-level').value==='hard'?'Competitivo':'Hábil'}`:net?'Rival humano · 3 vidas · puestos a 26,2 yd (24 m)':fixed?'8 destellos · 90 segundos · equipo equilibrado':'Un vuelo sin rivales ni límite de tiempo',audio:!!audio?.enabled,assists};
 }
 function editPreparation(kind,choice){
   if(kind==='help'){openModal('help-modal');return;}
@@ -130,11 +130,11 @@ function startCommission(){
 function recordCommission(){if(online?.active)return;if(!duel.result||duelRecorded)return;duelRecorded=true;duelStats[{win:'wins',loss:'losses',draw:'draws'}[duel.result.outcome]]++;save();}
 function leaveCommission(){stopTrail();if(online?.active){online.leave();duel.stop();physics.networkControlled=false;duel.rival.networkControlled=false;physics.anchor.set(0,1.35,0);physics.configure(setup);landscape.configure(setup);physics.reset();closeModal();setMode('flight');return;}if(duel.active)duel.finish('loss','Abandonaste la comisión.');recordCommission();duel.stop();closeModal();physics.reset();setMode('flight');}
 function showCommissionResult(){
-  const r=duel.result;if(!r)return;resultShown=true;renderPartyResults(r);$('result-title').textContent=r.winner?`${r.winner} ganó la Party`:'El cielo queda parejo.';$('result-reason').textContent=r.reason;$('result-player').textContent=r.playerHealth+'%';$('result-rival').textContent=r.rivalHealth+'%';$('result-detail').textContent=`${r.seconds} segundos · ${duel.engagements} cruces · ${counted(duelStats.wins,'victoria','victorias')}`;openModal('result-modal');
+  const r=duel.result;if(!r)return;resultShown=true;renderPartyResults(r);$('result-title').textContent=r.winner?`${r.winner} ganó la Party`:'El cielo queda parejo.';$('result-reason').textContent=r.reason;$('result-player').textContent=(r.playerLives??physics.lives??0)+' vidas';$('result-rival').textContent=(r.rivalLives??duel.rival.lives??0)+' vidas';$('result-detail').textContent=`${r.seconds} segundos · ${duel.engagements} cruces · ${counted(duelStats.wins,'victoria','victorias')}`;openModal('result-modal');
 }
 
 function renderPartyResults(r){
-  $('party-results').innerHTML=r.standings.map(e=>`<div style="--rival:${e.tint}"><strong>${escapeHTML(e.name)}</strong><span>${escapeHTML(e.reason)}</span><b>${e.health}%</b></div>`).join('');
+  $('party-results').innerHTML=r.standings.map(e=>`<div style="--rival:${e.tint}"><strong>${escapeHTML(e.name)}</strong><span>${escapeHTML(e.reason)}</span><b>${e.lives} vidas</b></div>`).join('');
   $('party-result-summary').textContent=`1 vs ${r.npcCount} NPC · ${r.eliminated} de ${r.npcCount} rivales fuera`;
 }
 function buildWorkshop(){
@@ -184,12 +184,12 @@ function updateUI(){
   document.body.classList.toggle('trailing',trail.visible&&mode==='flight');$('trail-hud').classList.toggle('hidden',!trail.visible||mode!=='flight');updateFollow();
   if(trail.visible){$('trail-clock').textContent=trail.state==='preparing'?String(Math.max(1,Math.ceil(trail.countdown))):formatTime(trail.remaining);$('trail-state').textContent={preparing:'PREPARACIÓN',playing:'CONTRARRELOJ',finished:'TERMINADO'}[trail.state];$('trail-count').textContent=`${trail.index} / ${trail.points.length}`;$('trail-best').textContent=trailBest?formatTime(trailBest,true):'—';$('trail-bonus').textContent=p.time-trail.lastPickup<1?'¡+2 segundos!':'+2 s por captura';$('trail-hud').classList.toggle('pickup',p.time-trail.lastPickup<1);$('trail-hud').classList.toggle('urgent',trail.remaining<15);all('#trail-dots i').forEach((el,i)=>{el.classList.toggle('done',i<trail.index);el.classList.toggle('current',i===trail.index);});}
   if(duel.partyMode&&duel.visible){
-    $('party-alive').textContent=`${duel.survivors.length} de ${duel.npcCount+1} en juego`;
-    for(let i=0;i<4;i++){const row=$('party-player-'+i),e=duel.roster[i];row.classList.toggle('hidden',!e);if(!e)continue;row.style.setProperty('--rival',e.tint);row.classList.toggle('is-out',!e.alive);row.querySelector('strong').textContent=e.name;row.querySelector('b').textContent=e.alive?Math.ceil(e.pilot.rope.integrity)+'%':e.reason==='Hilo cortado'?'CORTADO':'EN TIERRA';row.querySelector('em').style.width=Math.max(0,e.pilot.rope.integrity)+'%';row.querySelector('small').textContent=e.alive?'Energía '+Math.round(e.pilot.energy)+'%'+(e.intent?' · '+e.intent:''):'Fuera de la ronda';}
+    $('party-alive').textContent=`${duel.contenders.length} de ${duel.npcCount+1} con vidas`;
+    for(let i=0;i<4;i++){const row=$('party-player-'+i),e=duel.roster[i];row.classList.toggle('hidden',!e);if(!e)continue;row.style.setProperty('--rival',e.tint);row.classList.toggle('is-out',e.lives===0);row.classList.toggle('is-respawning',!e.alive&&e.lives>0);row.querySelector('strong').textContent=e.name;row.querySelector('b').textContent=`${e.lives} / ${e.pilot.maxLives} vidas`+(e.alive?` · ${Math.ceil(e.pilot.rope.integrity)}%`:'');row.querySelector('em').style.width=Math.max(0,e.pilot.rope.integrity)+'%';row.querySelector('small').textContent=e.alive?'Energía '+Math.round(e.pilot.energy)+'%'+(e.intent?' · '+e.intent:''):e.lives>0?`Vuelve en ${Math.max(1,Math.ceil(e.pilot.respawnAt-duel.elapsed))} s`:'Sin vidas · espectador';}
     const event=duel.events.at(-1);$('party-feed').textContent=event&&duel.elapsed-event.time<7?event.text:'';
   }
   if(!online?.active){$('rival-name').textContent='Mateo · NPC';$('rival-marker').querySelector('span').textContent='MATEO · NPC';$('result-rival-name').textContent='Mateo';}
-  if(duel.visible){const sec=duel.partyMode&&duel.rules==='last-man'?Math.floor(duel.elapsed):Math.ceil(duel.remaining);$('duel-timer').textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');$('duel-state').textContent={preparing:'PREPARACIÓN',playing:duel.spectating?'ESPECTANDO':duel.contact?'EN CONTACTO':'EN JUEGO',finished:'TERMINADA'}[duel.state];$('duel-hint').textContent=duel.message;$('duel-hud').classList.toggle('in-contact',duel.contact);for(const [id,val] of [['player',duel.playerHealth],['rival',duel.rivalHealth]]){$(id+'-integrity').textContent=Math.ceil(val)+'%';$(id+'-integrity-fill').style.width=val+'%';}}
+  if(duel.visible){const sec=duel.partyMode&&duel.rules==='last-man'?Math.floor(duel.elapsed):Math.ceil(duel.remaining);$('duel-timer').textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');$('duel-state').textContent={preparing:'PREPARACIÓN',playing:duel.spectating?'ESPECTANDO':duel.contact?'EN CONTACTO':'EN JUEGO',finished:'TERMINADA'}[duel.state];$('duel-hint').textContent=duel.message;$('duel-hud').classList.toggle('in-contact',duel.contact);for(const [id,val] of [['player',duel.playerHealth],['rival',duel.rivalHealth]]){$(id+'-integrity').textContent=`${(id==='player'?p:duel.rival).lives??3} vidas · ${Math.ceil(val)}%`;$(id+'-integrity-fill').style.width=val+'%';}}
   $('contact-load').textContent=duel.contact?`Carga ${strainPercent}% · ${duel.reversals} pasadas`:duel.state==='finished'?'TERMINADO':'SIN CONTACTO';
   updateControlState();
   const pulseAge=p.time-p.lastTug,tugRecent=p.state==='flying'&&pulseAge<.65;
@@ -197,7 +197,7 @@ function updateUI(){
   $('tug-progress').textContent=tugRecent?(p.tugSequence===2?`${p.tugIndex} / 2`:'TIRÓN'):(p.boost?'SHIFT + ESPACIO':'ESPACIO');
   if(cleanHeightRecord(p.position.y)>record+.1&&p.position.y<=p.lineLength+p.anchor.y+10&&mode==='flight'&&p.state==='flying'){record=p.position.y;save();}$('record-value').innerHTML=distanceHTML(record);
   $('flight-state-label').textContent={ready:'EN TIERRA',flying:'EN EL AIRE',cut:'CORTADO',grounded:'ATERRIZÓ'}[p.state];
-  $('launch-button').classList.toggle('hidden',p.state==='flying'||trail.visible);$('launch-button').innerHTML=p.state==='grounded'?'Otra vez <span>↗</span>':'Lanzar <span>↗</span>';
+  $('launch-button').classList.toggle('hidden',p.state==='flying'||trail.visible||duel.visible);$('launch-button').innerHTML=p.state==='grounded'?'Otra vez <span>↗</span>':'Lanzar <span>↗</span>';
   if(p.state==='ready'){
     if(wind<6.5)setStatus('Falta un poco de viento.','Puedes probar el lanzamiento o elegir una brisa más firme.','#b28d50');
     else if(wind>23)setStatus('El viento viene con fuerza.','Lanza con cuidado y suelta hilo poco a poco.','#bb794e');
@@ -225,8 +225,8 @@ function updateUI(){
   $('direction-label').textContent=(p.action==='release'?'GIRA · ':'APUNTA ')+(Math.cos(p.heading)<-.35?'ABAJO':Math.sin(p.heading)>.45?'DERECHA':Math.sin(p.heading)<-.45?'IZQUIERDA':'ARRIBA');
   $('assist-toggle').textContent='Ayudas visuales: '+(assists?'sí':'no');
   $('wind-compass').querySelector('.arrow').style.transformOrigin='32px 32px';$('wind-compass').querySelector('.arrow').style.transform=`rotate(${Math.atan2(p.wind.x,-p.wind.z)*180/Math.PI}deg)`;
-  const view=spectator();if(view.active)setStatus('El vuelo continúa sin hilo.',view.mode==='battle'?'Observando la batalla.':'El aire y la orientación deciden el planeo.');
-  document.body.classList.toggle('spectating',view.active);$('spectator-controls').classList.toggle('hidden',!view.active||mode!=='flight');$('spectator-name').textContent=view.mode==='battle'?(duel.watched?.name||'Todos los supervivientes'):physics.state==='grounded'?'Tu volantín aterrizó':view.onboard?'Cámara a bordo':'Tu volantín · '+({glide:'planeando',flutter:'flotando',dive:'en picada'}[physics.freeMode]||'sin hilo');
+  const view=spectator();if(view.active)setStatus(p.eliminated&&p.lives>0?`Vuelves en ${Math.max(1,Math.ceil(p.respawnAt-duel.elapsed))} s · ${p.lives} vidas`:'El vuelo continúa sin hilo.',view.mode==='battle'?'Observando la batalla.':'El aire y la orientación deciden el planeo.');
+  document.body.classList.toggle('spectating',view.active);$('spectator-controls').classList.toggle('hidden',!view.active||mode!=='flight');$('spectator-name').textContent=p.eliminated&&p.lives>0?`Nuevo lanzamiento en ${Math.max(1,Math.ceil(p.respawnAt-duel.elapsed))} s · ${p.lives} vidas`:view.mode==='battle'?(duel.watched?.name||'Todos los supervivientes'):physics.state==='grounded'?'Tu volantín aterrizó':view.onboard?'Cámara a bordo':'Tu volantín · '+({glide:'planeando',flutter:'flotando',dive:'en picada'}[physics.freeMode]||'sin hilo');
   for(const id of ['spectator-next','spectator-all'])$(id).classList.toggle('hidden',!duel.visible);for(const [id,m]of[['spectator-kite','kite'],['spectator-onboard','onboard'],['spectator-all','battle']])$(id).setAttribute('aria-pressed',view.mode===m);$('result-watch').classList.toggle('hidden',!view.active);$('spectator-result').classList.toggle('hidden',duel.state!=='finished');$('spectator-result').disabled=!!online?.active&&!resultShown;
   compactUI?.update({physics:p,duel,trail,online,audio,assists});
   if(audio){audio.gain.gain.setTargetAtTime(audio.enabled?(p.profile==='calm'?.002:clamp(p.wind.length()/1000,.002,.015)):0,audio.context.currentTime,.25);audio.filter.frequency.setTargetAtTime(260+p.wind.length()*75,audio.context.currentTime,.25);}
@@ -314,7 +314,7 @@ function frame(now){
   const dt=lastTime?Math.min((now-lastTime)/1000,.08):1/60;lastTime=now;
   if(online?.active)online.render(physics,duel);
   if(mode==='intro'&&!modal){physics.time+=dt;physics.windAt(physics.position,physics.wind);}
-  if(mode==='flight'&&!online?.active&&!modal&&!document.hidden){accumulator+=dt;const step=1/240;while(accumulator>=step){const wasSpectating=spectator().active;physics.step(step);duel.step(step);if(!wasSpectating&&spectator().active){releaseAll();landscape.follow=true;landscape.orbit.active=false;landscape.orbit.reset();}if(!duel.visible)solveRopeSystem([physics.rope],step);trail.step(step);accumulator-=step;}}
+  if(mode==='flight'&&!online?.active&&!modal&&!document.hidden){accumulator+=dt;const step=1/240;while(accumulator>=step){const wasSpectating=spectator().active;physics.step(step);duel.step(step);if(wasSpectating!==spectator().active){releaseAll();landscape.follow=true;landscape.orbit.active=false;landscape.orbit.reset();}if(!duel.visible)solveRopeSystem([physics.rope],step);trail.step(step);accumulator-=step;}}
   if(mode==='flight'&&!online?.active&&duel.state==='finished'&&!duelRecorded){recordCommission();releaseAll();resultAt=physics.time;}
   if(!online?.active&&duel.state==='finished'&&!resultShown&&!modal&&!spectator().active&&physics.time-resultAt>2.5)showCommissionResult();
   if(trail.state==='finished'&&!trailFinishedAt){trailFinishedAt=physics.time;releaseAll();if(trail.result.won&&(!trailBest||trail.elapsed<trailBest)){trailBest=trail.elapsed;trailNewBest=true;save();}}
@@ -373,8 +373,8 @@ try{
       releaseAll();setTimeout(()=>{if(!online?.active||online.latest?.round!==data.round||online.latest?.phase!=='finished')return;
       online.render(physics,duel);releaseAll();resultShown=true;const r=duel.result;
       $('result-title').textContent={win:'La comisión es tuya.',loss:'Tu rival ganó esta vez.',draw:'El cielo queda parejo.'}[r.outcome];
-      $('result-reason').textContent=physics.rope.broken>=0&&physics.rope.cutReason!=='ground'?'Se cortó tu hilo.':duel.rival.rope.broken>=0&&duel.rival.rope.cutReason!=='ground'?'Cortaste el hilo rival.':r.reason.includes('tierra')?'La comisión terminó al tocar tierra.':r.reason.includes('abandon')?'Un jugador abandonó la sala.':r.reason;
-      $('result-player').textContent=r.playerHealth+'%';$('result-rival').textContent=r.rivalHealth+'%';$('result-detail').textContent=`Ronda ${data.round} · ${r.seconds} segundos · ${duel.engagements} cruces`;
+      $('result-reason').textContent=r.reason;
+      $('result-player').textContent=(r.playerLives??physics.lives??0)+' vidas';$('result-rival').textContent=(r.rivalLives??duel.rival.lives??0)+' vidas';$('result-detail').textContent=`Ronda ${data.round} · ${r.seconds} segundos · ${duel.engagements} cruces`;
       if(!spectator().active)openModal('result-modal');
       },2500);
     }

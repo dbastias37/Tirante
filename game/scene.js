@@ -9,6 +9,8 @@ import {createReelModel,disposeModel} from './equipment-models.js';
 import {TrailView,drawCanvasTrail} from './trail-view.js';
 import {frameDuel,positionView} from './duel-camera.js';
 import {reelViewport,foregroundLine} from './reel-view.js';
+import {ROPE_DRAW_SEGMENTS} from './rope.js';
+import {displayStrands,LOOSE_SUBDIVISIONS} from './rope-view.js';
 import * as THREE from './vendor/three.module.js';
 import {clamp,mix,configuration} from './physics.js';
 import {PAPER_OPACITY,FIELD_SIZE,CAMERA_NEAR,CAMERA_FAR,SKY_RADIUS,HORIZON_RADIUS,FOG_NEAR,FOG_FAR,renderPixelRatio,terrainHeight} from './render-settings.js';
@@ -93,14 +95,14 @@ export class Landscape {
     const fill=new THREE.DirectionalLight(0xc1e5ee,.7);fill.position.set(10,8,6);this.scene.add(fill);
     this.createSky();this.createLandscape();this.createReel();this.trailView=new TrailView(this.scene);
     this.kite=new PaperKite();this.kite.configure(physics.setup);this.scene.add(this.kite.group);
-    this.rope=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(Array.from({length:80},()=>v3())),new THREE.LineBasicMaterial({color:0xf8efc8,transparent:true,opacity:.9}));this.rope.frustumCulled=false;this.scene.add(this.rope);
+    this.rope=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(Array.from({length:ROPE_DRAW_SEGMENTS*LOOSE_SUBDIVISIONS*2},()=>v3())),new THREE.LineBasicMaterial({color:0xf8efc8,transparent:true,opacity:.9}));this.rope.frustumCulled=false;this.scene.add(this.rope);
     this.rivalVisuals=Array.from({length:3},()=>this.createRival());
     const first=this.rivalVisuals[0];this.rivalKite=first.kite;this.rivalRope=first.rope;this.rivalPilot=first.pilot;
     for(const rope of [this.rope,...this.rivalVisuals.map(v=>v.rope)]){
-      rope.geometry.setAttribute('color',new THREE.BufferAttribute(new Float32Array(80*3).fill(1),3));rope.material.vertexColors=true;rope.material.color.setHex(0xffffff);
+      rope.geometry.setAttribute('color',new THREE.BufferAttribute(new Float32Array(ROPE_DRAW_SEGMENTS*LOOSE_SUBDIVISIONS*2*3).fill(1),3));rope.material.vertexColors=true;rope.material.color.setHex(0xffffff);
       rope.userData.fray=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(Array.from({length:120},()=>v3())),new THREE.LineBasicMaterial({color:0xedd29d}));rope.userData.fray.frustumCulled=false;this.scene.add(rope.userData.fray);
       rope.userData.tips=new THREE.Points(new THREE.BufferGeometry().setFromPoints([v3(),v3()]),new THREE.PointsMaterial({color:0xfbe6b2,size:3,sizeAttenuation:false}));rope.userData.tips.frustumCulled=false;rope.userData.tips.visible=false;this.scene.add(rope.userData.tips);
-      const wideGeometry=new THREE.BufferGeometry();for(const attr of ['position','color'])wideGeometry.setAttribute(attr,new THREE.Float32BufferAttribute(new Float32Array(40*6*3),3));rope.userData.ribbon=new THREE.Mesh(wideGeometry,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));rope.userData.ribbon.frustumCulled=false;rope.userData.ribbon.visible=false;this.scene.add(rope.userData.ribbon);rope.material.visible=false;
+      const wideGeometry=new THREE.BufferGeometry();for(const attr of ['position','color'])wideGeometry.setAttribute(attr,new THREE.Float32BufferAttribute(new Float32Array(ROPE_DRAW_SEGMENTS*LOOSE_SUBDIVISIONS*6*3),3));rope.userData.ribbon=new THREE.Mesh(wideGeometry,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));rope.userData.ribbon.frustumCulled=false;rope.userData.ribbon.visible=false;this.scene.add(rope.userData.ribbon);rope.material.visible=false;
     }
     this.clashGlow=mesh(new THREE.SphereGeometry(.07,8,6),0xffcf73);this.clashGlow.material=new THREE.MeshBasicMaterial({color:0xffd780});this.clashGlow.visible=false;this.scene.add(this.clashGlow);
     this.kiteShadow=mesh(new THREE.CircleGeometry(.43,24),0x445037);this.kiteShadow.material.transparent=true;this.kiteShadow.material.opacity=.15;this.kiteShadow.material.depthWrite=false;this.kiteShadow.material.polygonOffset=true;this.kiteShadow.material.polygonOffsetFactor=-1;this.kiteShadow.material.polygonOffsetUnits=-2;this.kiteShadow.rotation.x=-Math.PI/2;this.scene.add(this.kiteShadow);
@@ -109,7 +111,7 @@ export class Landscape {
   }
   createRival(){
     const kite=new PaperKite();kite.configure({...this.physics.setup,color:'teal'});kite.group.visible=false;this.scene.add(kite.group);
-    const rope=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(Array.from({length:80},()=>v3())),new THREE.LineBasicMaterial({color:0xffffff}));rope.frustumCulled=false;rope.visible=false;this.scene.add(rope);
+    const rope=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(Array.from({length:ROPE_DRAW_SEGMENTS*LOOSE_SUBDIVISIONS*2},()=>v3())),new THREE.LineBasicMaterial({color:0xffffff}));rope.frustumCulled=false;rope.visible=false;this.scene.add(rope);
     const pilot=new THREE.Group(),torso=mesh(new THREE.CylinderGeometry(.2,.17,.65,7),0x397f80);torso.position.y=1.02;pilot.add(torso);const head=mesh(new THREE.SphereGeometry(.14,12,9),0xc69876);head.position.y=1.53;pilot.add(head);
     for(const x of [-.12,.12]){const leg=mesh(new THREE.CylinderGeometry(.07,.06,.74,6),0x465e55);leg.position.set(x,.37,0);pilot.add(leg);const arm=mesh(new THREE.CapsuleGeometry(.055,.35,3,6),0xc69876);arm.position.set(x*1.9,1.16,-.12);arm.rotation.x=-.7;arm.rotation.z=-x;pilot.add(arm);}pilot.visible=false;this.scene.add(pilot);
     return {kite,rope,pilot,torso};
@@ -177,10 +179,10 @@ export class Landscape {
   configure(s){this.kite.configure(s);this.configureReel(s);}
   drag(dx,dy){if(spectatorView(this.physics,this.duel).onboard)return;if(this.orbit.active||spectatorView(this.physics,this.duel).orbital){this.orbit.drag(dx,dy);return;}if(this.follow){this.camera.getWorldDirection(this.forward);this.yaw=Math.atan2(this.forward.x,-this.forward.z);this.pitch=Math.asin(this.forward.y);}this.follow=false;this.yaw-=dx*.0035;this.pitch=clamp(this.pitch+dy*.003,-.35,1.4);}
   updateTether(line,p){
-    const r=p.rope,points=p===this.physics&&this.reelLinePoints?this.reelLinePoints:r.points,attr=line.geometry.attributes.position,colors=line.geometry.attributes.color,fray=line.userData.fray.geometry.attributes.position;let index=0,fi=0;
+    const r=p.rope,drawn=displayStrands(r,p===this.physics&&this.reelLinePoints?this.reelLinePoints:r.points,line.userData.looseCache||=[]),points=drawn.points,attr=line.geometry.attributes.position,colors=line.geometry.attributes.color,fray=line.userData.fray.geometry.attributes.position;let index=0,fi=0;
     const tint=new THREE.Color();
-    for(let i=0;i<r.points.length-1;i++){
-      if(i===r.broken)continue;
+    for(let i=0;i<points.length-1;i++){
+      if(i===drawn.broken)continue;
       const wear=r.broken<0?r.wearAt(i):0,contact=r.contactAge<.1&&Math.abs(i-r.contactEdge)<2;
       tint.set(wear>.25?0xdf9a5e:contact?0xffd78e:p===this.physics?0xf8efc8:p.partyTint||0x64aaa8);
       for(const id of [i,i+1]){this._temp.copy(points[id]);attr.setXYZ(index,this._temp.x,this._temp.y,this._temp.z);colors.setXYZ(index++,tint.r,tint.g,tint.b);}

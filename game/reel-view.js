@@ -16,12 +16,18 @@ export function foregroundLine(rope,camera,width,height,outlet,cache=[]){
   const origin=new Vector3(outlet.x/width*2-1,1-outlet.y/height*2,0).unproject(camera);
   // Keep the foreground outlet at a small, stable viewing distance.
   origin.sub(camera.position).normalize().multiplyScalar(.65).add(camera.position);
-  const offset=origin.clone().sub(rope.points[0]);
   cache.length=rope.points.length;
-  for(let i=0;i<rope.points.length;i++){
-    const q=rope.points[i],near=1-Math.min(1,q.distanceTo(rope.points[0])/2),attached=rope.broken<0||i<=rope.broken;
-    const blend=i===rope.points.length-1||!attached?0:near*near;
-    (cache[i]||=new Vector3()).copy(q).addScaledVector(offset,blend);
-  }
+  for(let i=0;i<rope.points.length;i++)(cache[i]||=new Vector3()).copy(rope.points[i]);
+  const limit=rope.broken>=0?rope.broken:rope.points.length-2;
+  if(limit<1)return cache;
+  // Join in front of the camera. Blending toward the physical anchor behind
+  // the eye made the thread dip offscreen and return in a hook at the reel.
+  let join=1;const above=1-2*Math.min(height*.74,outlet.y-24)/height;
+  for(;join<limit;join++){const q=rope.points[join].clone().project(camera);if(q.z<1&&q.z>-1&&q.y>above&&rope.points[join].distanceTo(camera.position)>2)break;}
+  const end=rope.points[join],direction=end.clone().sub(origin),length=direction.length();
+  const tangent=join<limit?rope.points[join+1].clone().sub(end).normalize():direction.clone().normalize();
+  // Bounded Bézier handles cannot make a loop or displace the kite junction.
+  const c1=origin.clone().addScaledVector(direction,.34),c2=end.clone().addScaledVector(tangent,-Math.min(length*.18,.3));
+  for(let i=0;i<join;i++){const t=i/join,u=1-t;cache[i].copy(origin).multiplyScalar(u*u*u).addScaledVector(c1,3*u*u*t).addScaledVector(c2,3*u*t*t).addScaledVector(end,t*t*t);}
   return cache;
 }

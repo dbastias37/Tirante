@@ -5,6 +5,7 @@ import {OrbitCamera} from './orbit-camera.js';
 import {spectatorView,onboardFrame} from './spectator-camera.js';
 import {ArticulatedTail} from './tail.js';
 import {reelViewport,canvasReelOutlet,foregroundLine} from './reel-view.js';
+import {displayStrands} from './rope-view.js';
 import {equipmentStats} from './equipment.js';
 import {drawCanvasTrail} from './trail-view.js';
 import {frameDuel,positionView} from './duel-camera.js';
@@ -95,14 +96,14 @@ export class CanvasLandscape {
     if(duel.contact){const point=this.project(duel.contactPoint);if(point.z<1){c.strokeStyle='#ffe2a0';c.lineWidth=2;c.beginPath();c.arc(point.x,point.y,6+Math.sin(time*14)*2,0,Math.PI*2);c.stroke();}}
   }
   drawTether(p,color){
-    const r=p.rope,c=this.ctx,points=(p===this.physics&&this.reelLinePoints?this.reelLinePoints:r.points).map(q=>this.project(q));
+    const r=p.rope,c=this.ctx,drawn=displayStrands(r,p===this.physics&&this.reelLinePoints?this.reelLinePoints:r.points,r._drawCache||=[]),points=drawn.points.map(q=>this.project(q));
     for(let i=0;i<points.length-1;i++){
-      if(i===r.broken)continue;const a=points[i],b=points[i+1];if(a.z>1||b.z>1)continue;
+      if(i===drawn.broken)continue;const a=points[i],b=points[i+1];if(a.z>1||b.z>1)continue;
       const worn=r.broken<0?r.wearAt(i):0,contact=r.contactAge<.1&&Math.abs(i-r.contactEdge)<2;
       const thickness=(p.equipment?.thread.diameter||.5)/.5;c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.strokeStyle='#3c514b70';c.lineWidth=1.5+1.2*thickness;c.stroke();c.strokeStyle=worn>.25?'#df9a5e':contact?'#ffe4a0':color;c.lineWidth=(contact?1.8:1.2)*thickness;c.stroke();
       if(worn>.2){const x=(a.x+b.x)*.5,y=(a.y+b.y)*.5;c.beginPath();c.moveTo(x-3,y+4);c.lineTo(x,y);c.lineTo(x+4,y+3);c.lineWidth=.8;c.stroke();}
     }
-    if(r.broken>=0)for(const id of [r.broken,r.broken+1]){const q=points[id];if(q.z>1)continue;c.fillStyle=color;c.beginPath();c.arc(q.x,q.y,2.4,0,Math.PI*2);c.fill();}
+    if(r.broken>=0)for(const id of [drawn.broken,drawn.broken+1]){const q=points[id];if(q.z>1)continue;c.fillStyle=color;c.beginPath();c.arc(q.x,q.y,2.4,0,Math.PI*2);c.fill();}
     if(r.breakAge<.6){const q=this.project(r.breakPoint);c.strokeStyle=`rgba(255,239,192,${1-r.breakAge/.6})`;c.lineWidth=2;c.beginPath();c.arc(q.x,q.y,5+r.breakAge*32,0,Math.PI*2);c.stroke();}
   }
   drawReel(time){

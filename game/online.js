@@ -57,7 +57,7 @@ export class OnlineGame{
     const playing=['preparing','playing'].includes(d?.phase),left=d?.players.some(p=>p?.left);
     $('online-ready').disabled=!d||playing||left;$('online-ready').textContent=d?.players[d.slot]?.ready?'Cancelar listo':d?.phase==='finished'?'Listo para la revancha ↗':'Estoy listo ↗';
     $('online-return').classList.toggle('hidden',!playing);$('online-room-note').textContent=left?'Un jugador salió. Crea otra sala para un nuevo duelo.':d?.paused?'Esperando la reconexión. La física y el reloj están detenidos.':playing?'El duelo sigue mientras tengas el menú abierto.':'La partida comienza cuando ambos pulsen «Estoy listo».';
-    $('online-room-rules').textContent=d?`${distanceText(d.settings.capacity)} de hilo · ${(d.settings.wind*3.6).toFixed(1)} km/h · 90 segundos`:'';
+    $('online-room-rules').textContent=d?`${distanceText(d.settings.capacity)} de hilo · ${(d.settings.wind*3.6).toFixed(1)} km/h · 3 vidas · 180 segundos · puestos a 26,2 yd (24 m)`:'';
   }
   render(p,duel,now=performance.now()){
     const d=this.latest;if(!d?.match)return;const m=d.match,own=d.slot,views=own?[duel.rival,p]:[p,duel.rival],fresh=this.visualSnapshot!==d;
@@ -82,7 +82,7 @@ export class OnlineGame{
     const anchor=m.pilots[own].body.anchor.vector,prevAnchor=old?.pilots[own].body.anchor.vector||anchor;
     const offset=[prevAnchor[0]+(anchor[0]-prevAnchor[0])*t,0,prevAnchor[2]+(anchor[2]-prevAnchor[2])*t];
     for(const [view,slot] of [[p,own],[duel.rival,1-own]]){
-      const k=m.pilots[slot],source=old?.pilots[slot],a=source?.rope.broken===k.rope.broken?source:null,previous=view.rope.points.map(p=>p.clone());view.networkControlled=true;
+      const k=m.pilots[slot],source=old?.pilots[slot],sameLife=source?.body.lifeSerial===k.body.lifeSerial,a=source?.rope.broken===k.rope.broken&&sameLife?source:null,previous=view.rope.points.map(p=>p.clone());view.networkControlled=true;
       if(fresh&&JSON.stringify(view.setup)!==JSON.stringify(k.setup))view.configure(k.setup);
       for(const [key,value] of Object.entries(k.body)){
         if(value?.vector){const arr=value.vector,prev=a?.body[key]?.vector||arr;
@@ -93,7 +93,7 @@ export class OnlineGame{
       const r=k.rope,canLerp=a&&a.rope.broken===r.broken&&a.rope.points.length===r.points.length;
       while(view.rope.points.length<r.points.length)view.rope.points.push(new Vector3());view.rope.points.length=r.points.length;
       r.points.forEach((v,i)=>{const prev=canLerp?a.rope.points[i]:v;view.rope.points[i].set(prev[0]+(v[0]-prev[0])*t-offset[0],prev[1]+(v[1]-prev[1])*t,prev[2]+(v[2]-prev[2])*t-offset[2]);});
-      view.rope.previous=this.viewRound===d.round&&previous.length===view.rope.points.length?previous:view.rope.points.map(p=>p.clone());
+      view.rope.previous=sameLife&&this.viewRound===d.round&&previous.length===view.rope.points.length?previous:view.rope.points.map(p=>p.clone());
       for(const key of ['broken','breakAge','contactEdge','contactAge','contactLoad','integrity','stressLoad','strength','stressRatio','jamTime','cutReason'])view.rope[key]=r[key];
       view.rope.contactPoint.fromArray(r.contactPoint).sub(new Vector3(offset[0],0,offset[2]));view.rope.breakPoint=r.breakPoint?new Vector3().fromArray(r.breakPoint).sub(new Vector3(offset[0],0,offset[2])):null;
       if(fresh){view.rope.wear.fill(0);for(const [i,n] of r.wear)view.rope.wear[i]=n;}
@@ -107,6 +107,7 @@ export class OnlineGame{
     duel.playerHealth=own?m.rivalHealth:m.playerHealth;duel.rivalHealth=own?m.playerHealth:m.rivalHealth;duel.contactPoint.fromArray(m.contactPoint).sub(new Vector3(offset[0],0,offset[2]));
     duel.lastHit=m.lastHit?(own?{i:m.lastHit.j,j:m.lastHit.i,s:m.lastHit.t,t:m.lastHit.s}:m.lastHit):null;
     duel.message=d.paused?'Esperando reconexión · reloj detenido':m.message.replaceAll('hilo azul','hilo rival');
-    duel.result=m.result?{...m.result,outcome:own?{win:'loss',loss:'win',draw:'draw'}[m.result.outcome]:m.result.outcome,playerHealth:Math.round(duel.playerHealth),rivalHealth:Math.round(duel.rivalHealth)}:null;
+    duel.result=m.result?{...m.result,outcome:own?{win:'loss',loss:'win',draw:'draw'}[m.result.outcome]:m.result.outcome,playerHealth:Math.round(duel.playerHealth),rivalHealth:Math.round(duel.rivalHealth),playerLives:p.lives,rivalLives:duel.rival.lives}:null;
+    if(own&&duel.result)duel.result.reason=({'El rival agotó sus 3 vidas.':'Agotaste tus 3 vidas.','Agotaste tus 3 vidas.':'El rival agotó sus 3 vidas.'})[duel.result.reason]||duel.result.reason;
   }
 }

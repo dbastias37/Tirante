@@ -1,7 +1,9 @@
 import {solveRopeSystem} from './rope-system.js';
 import {mixSeed} from './line-stress.js';
+import {controlNPC} from './npc-pilot.js';
 import {Vector3} from './vendor/three.module.js';
 import {KitePhysics,DEFAULT_SETUP,clamp} from './physics.js';
+import {PILOT_SPACING,LAUNCH_SECONDS,DUEL_SECONDS,prepareLives,launchLife,loseLife,respawnLife,climbControls} from './battle-rules.js';
 const v=()=>new Vector3();
 const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
 
@@ -14,69 +16,44 @@ export function lineContact(player,rival){
 export class Commission {
   constructor(player){
     this.player=player;this.rival=new KitePhysics({...DEFAULT_SETUP,color:'teal',knotsLeft:1},{seed:mixSeed(player.flightSeed^1)});this.rival.anchor.set(3.2,1.35,0);this.rival.reset();
-    this.state='idle';this.elapsed=0;this.remaining=90;this.playerHealth=100;this.rivalHealth=100;this.contact=false;this.contactPoint=v();this.contactTime=0;this.engagements=0;this.lastPlayerPull=0;this.lastRivalPull=0;this.result=null;this.aiWait=0;this.attackAt=4;this.message='Acércate al hilo azul.';this.difficulty='normal';this.playerStroke=new SawStroke();this.rivalStroke=new SawStroke();this.pressure=0;this.sliding=0;this.reversals=0;this.lastHit=null;
+    this.state='idle';this.elapsed=0;this.remaining=90;this.playerHealth=100;this.rivalHealth=100;this.contact=false;this.contactPoint=v();this.contactTime=0;this.engagements=0;this.lastPlayerPull=0;this.lastRivalPull=0;this.result=null;this.aiWait=0;this.attackAt=4;this.message='Acércate al hilo azul.';this.difficulty='normal';this.playerStroke=new SawStroke();this.rivalStroke=new SawStroke();this.pressure=0;this.sliding=0;this.reversals=0;this.lastHit=null;prepareLives(this.player);prepareLives(this.rival);
   }
   get active(){return this.state==='preparing'||this.state==='playing';}
   get visible(){return this.state!=='idle';}
+  get spectating(){return this.visible&&!!this.player.eliminated;}
   start(difficulty='normal'){
     this.difficulty=difficulty;this.state='preparing';this.elapsed=0;this.remaining=90;this.playerHealth=this.rivalHealth=100;this.contact=false;this.contactTime=0;this.engagements=0;this.lastPlayerPull=this.lastRivalPull=0;this.result=null;this.aiWait=0;this.attackAt=4;this.message='Tomando altura · 3';
     this.playerStroke.reset();this.rivalStroke.reset();this.pressure=0;this.sliding=0;this.reversals=0;this.lastHit=null;this.lastContactAt=-100;this.footworkAt=0;
-    this.player.launch();this.rival.anchor.set(3.2,1.35,0);this.rival.lineCapacity=this.player.lineCapacity;this.rival.launch();this.rival.time=this.player.time;this.rival.spinSign=-1;
+    this._rivalAI=null;this.remaining=DUEL_SECONDS;prepareLives(this.player);prepareLives(this.rival);launchLife(this.player);this.rival.anchor.copy(this.player.anchor);this.rival.anchor.x+=PILOT_SPACING;this.rival.lineCapacity=this.player.lineCapacity;launchLife(this.rival);this.rival.time=this.player.time;this.rival.spinSign=-1;
     this.rival.profile=this.player.profile;this.rival.windSpeed=this.player.windSpeed;
   }
   stop(){this.state='idle';this.contact=false;this.result=null;this.rival.reset();}
   finish(outcome,reason){
     if(!this.active)return;
     this.state='finished';this.contact=false;this.player.sawing=false;this.rival.sawing=false;this.message=reason;this.result={outcome,reason,seconds:Math.round(this.elapsed),playerHealth:Math.round(this.playerHealth),rivalHealth:Math.round(this.rivalHealth)};
-    this.player.setControls('hold');this.rival.setControls('hold');
+    this.result.playerLives=this.player.lives;this.result.rivalLives=this.rival.lives;this.player.setControls('hold');this.rival.setControls('hold');
     if(this.playerHealth<=0)this.player.cutLine(this.lastHit?.i,this.lastHit?.s);if(this.rivalHealth<=0)this.rival.cutLine(this.lastHit?.j,this.lastHit?.t);
   }
   controlRival(dt){
-    const p=this.player,b=this.rival;this.aiWait=Math.max(0,this.aiWait-dt);
-    const dx=p.position.x-3.2-b.position.x;
-    const desired=clamp(dx*.19-b.velocity.x*.16,-.85,.55);
-    const error=wrap(desired-b.heading);
-    // Visible footwork aligns the depth of the crossing. The pilot walks; the
-    // sail and cord respond through the same solver, without teleporting them.
-    if(!this.contact&&this.elapsed>1&&this.elapsed>=(this.footworkAt||0)){
-      this.footworkAt=this.elapsed+.05;
-      let nearest=null;for(let i=8;i<27;i++)for(let j=8;j<27;j++){
-        const hit=closestSegments(p.rope.points[i],p.rope.points[i+1],b.rope.points[j],b.rope.points[j+1]);
-        if(!nearest||hit.distance<nearest.distance)nearest=hit;
-      }
-      if(nearest&&Math.abs(nearest.a.x-nearest.b.x)<1.2){
-        const pace=clamp((nearest.a.z-nearest.b.z)*3,-.65,.65);
-        b.anchor.z=clamp(b.anchor.z+pace*.05,-3,3);b.energy=Math.max(0,b.energy-Math.abs(pace)*.05*.8);
-      }
-    }
-    // Fixed bridle bias; the opponent steers by catching a heading with the line.
-    let action='hold',boost=false;
-    if(this.aiWait>0)action='hold';
-    else if(error<-.13&&b.position.y>3.5&&b.lineRemaining>.4){action='release';}
-    else if(Math.abs(b.spin)>.3&&Math.abs(error)<.38){action='reel';this.aiWait=.24;}
-    else if(b.lineLength>p.lineLength+.55&&Math.cos(b.heading)>.5)action='reel';
-    else if(b.lineLength<p.lineLength-.55&&b.position.y>4){action='release';}
-    if(b.position.y<3.5&&Math.cos(b.heading)<.2){action='release';boost=true;}
-    b.sawing=this.contact&&(this.difficulty==='hard'||this.elapsed%4<1.5);
-    if(this.contact)action='hold';
-    if(b.sawing){action=b.action;boost=this.difficulty==='hard'&&b.energy>35;}
-    b.setControls(action,boost);
+    const p=this.player,b=this.rival;
+    if(b.eliminated){b.setControls('hold');return;}
+    if(!this._rivalAI||this._rivalAI.serial!==b.lifeSerial)this._rivalAI={pilot:b,index:1,alive:true,homeX:b.anchor.x,homeZ:b.anchor.z,side:1,phase:0,thinkIn:0,serial:b.lifeSerial};
+    controlNPC({roster:[{pilot:p,index:0,alive:p.state==='flying'&&!p.eliminated},this._rivalAI],difficulty:this.difficulty,elapsed:this.elapsed},this._rivalAI,dt);
   }
   step(dt){
     if(!this.visible)return;
     const b=this.rival,p=this.player;b.profile=p.profile;b.windSpeed=p.windSpeed;
     if(this.state==='finished'){b.step(dt);solveRopeSystem([p.rope,b.rope],dt);return;}
     if(this.state==='preparing'){
-      this.elapsed+=dt;p.setControls('hold');b.setControls('hold');b.step(dt);solveRopeSystem([p.rope,b.rope],dt);this.message='Tomando altura · '+Math.max(1,Math.ceil(3-this.elapsed));
-      if(this.elapsed>=3){this.state='playing';this.elapsed=0;this.message='Cruza el hilo azul.';}return;
+      climbControls(b,this.elapsed);this.elapsed+=dt;climbControls(p,this.elapsed);b.step(dt);solveRopeSystem([p.rope,b.rope],dt);this.message='Tomando altura · '+Math.max(1,Math.ceil(LAUNCH_SECONDS-this.elapsed));
+      if(this.elapsed>=LAUNCH_SECONDS){this.state='playing';this.elapsed=0;p.setControls('hold');b.setControls('hold');this.message='Gana altura antes de buscar el cruce.';}return;
     }
-    this.elapsed+=dt;this.remaining=Math.max(0,90-this.elapsed);this.controlRival(dt);b.step(dt);const physical=solveRopeSystem([p.rope,b.rope],dt)[0];
+    this.elapsed+=dt;this.remaining=Math.max(0,DUEL_SECONDS-this.elapsed);this.controlRival(dt);b.step(dt);const physical=solveRopeSystem([p.rope,b.rope],dt)[0];
     this.playerHealth=p.rope.integrity;this.rivalHealth=b.rope.integrity;
     if(p.state!=='flying'||b.state!=='flying'){
-      const outP=p.state!=='flying',outB=b.state!=='flying',loser=outP?p:b,cut=loser.rope.broken>=0&&loser.rope.cutReason!=='ground',why=loser.rope.cutReason==='wind'?'por una ráfaga extrema':loser.rope.cutReason==='tension'?'por exceso de tensión en el cruce':'';
-      this.finish(outP&&outB?'draw':outB?'win':'loss',outP&&outB?'Ambos volantines quedaron fuera.':cut?`${outP?'Tu hilo se cortó':'Se cortó el hilo del rival'}${why?' '+why:''}.`:outB?'El rival tocó tierra.':'Tu volantín tocó tierra.');return;
+      this.updateLives();this.checkOutcome();if(!this.active)return;
     }
-    const hit=physical?.hit;this.contact=!!hit;this.sliding=0;this.pressure=0;
+    const hit=!p.eliminated&&!b.eliminated?physical?.hit:null;this.contact=!!hit;this.sliding=0;this.pressure=0;
     if(hit){
       const contact=physical.contact;this.lastHit=hit;
       this.contactPoint.copy(contact.point);this.contactTime+=dt;if(this.elapsed-this.lastContactAt>.35)this.engagements++;this.lastContactAt=this.elapsed;
@@ -102,7 +79,21 @@ export class Commission {
       if(this.elapsed-this.rivalStroke.lastReversal>1){this.rivalStroke.direction=0;this.rivalStroke.travel=0;}
       this.message='Busca el contacto real con el hilo azul. Al cruzarlo, alterna Q / E o mantén F.';
     }
-    if(this.playerHealth<=0||this.rivalHealth<=0)this.finish(this.playerHealth===this.rivalHealth?'draw':this.rivalHealth<=0?'win':'loss',this.rivalHealth<=0?'Cortaste el hilo del rival.':'El rival cortó tu hilo.');
-    else if(this.remaining<=0){const diff=this.playerHealth-this.rivalHealth;this.finish(Math.abs(diff)<1?'draw':diff>0?'win':'loss',Math.abs(diff)<1?'Tiempo cumplido: los hilos quedaron iguales.':'Tiempo cumplido: gana el hilo con menos desgaste.');}
+    this.updateLives();this.checkOutcome();
+    if(p.eliminated&&p.lives>0)this.message=`Vuelves en ${Math.max(1,Math.ceil(p.respawnAt-this.elapsed))} s · ${p.lives} vidas.`;
+    else if(b.eliminated&&b.lives>0)this.message=`El rival vuelve en ${Math.max(1,Math.ceil(b.respawnAt-this.elapsed))} s · ${b.lives} vidas.`;
+    else if(!this.contact&&p.position.y<18)this.message='Gana altura: suelta en pulsos cortos y mantén para estabilizar.';
+  }
+  updateLives(){
+    for(const [i,p]of [this.player,this.rival].entries()){
+      if(!p.eliminated&&(p.state!=='flying'||p.rope.integrity<=0)){const cut=p.rope.integrity<=0&&p.rope.cutReason!=='ground';if(cut)p.cutLine(i?this.lastHit?.j:this.lastHit?.i,i?this.lastHit?.t:this.lastHit?.s);loseLife(p,this.elapsed,cut?'Hilo cortado':'En tierra');}
+      if(respawnLife(p,this.elapsed)){(i?this.rivalStroke:this.playerStroke).reset();if(i)p.spinSign=-1;this.lastHit=null;this.contact=false;}
+    }
+    this.playerHealth=this.player.rope.integrity;this.rivalHealth=this.rival.rope.integrity;
+  }
+  checkOutcome(){
+    const p=this.player,b=this.rival;
+    if(p.lives<=0||b.lives<=0){this.finish(p.lives===b.lives?'draw':b.lives<=0?'win':'loss',p.lives===b.lives?'Ambos agotaron sus vidas.':b.lives<=0?'El rival agotó sus 3 vidas.':'Agotaste tus 3 vidas.');return;}
+    if(this.remaining<=0){const diff=p.lives-b.lives||((this.playerHealth-this.rivalHealth)/100);this.finish(Math.abs(diff)<.01?'draw':diff>0?'win':'loss',Math.abs(diff)<.01?'Tiempo cumplido: empate en vidas y estado del hilo.':'Tiempo cumplido: gana quien conserva más vidas; desempata el hilo.');}
   }
 }

@@ -1,3 +1,11 @@
+## Ajustes 1.14 · hilo suelto y batallas con vidas
+
+Las restricciones de los hilos cortados solo transmiten tracción: un segmento comprimido no empuja al vecino. Se subdividen al cortar con una separación objetivo de 0,35 m y un presupuesto de menos de 320 enlaces, sin añadir esos enlaces al solucionador de contacto. El suelo aporta fricción. Las curvas de dibujo se suavizan únicamente en hebras cortadas, que ya no bloquean trayectorias; el hilo intacto conserva la geometría de contacto. El anclaje al carrete en primera persona es una representación visual delante de la cámara y no mueve el anclaje físico.
+
+Los puestos de batalla parten a 24 m de distancia. La preparación dura 8 s y usa pulsos de los controles normales para elevar, sin colocar el volantín directamente en el cielo. Los NPC suben antes de buscar un punto de cruce aéreo y estiman el alcance desde su propio puesto. Los desplazamientos laterales se limitan para conservar al menos 18 m entre pilotos.
+
+Duelo y Party normal usan tres vidas; Último en pie permite 3, 5 o 10. La pérdida se contabiliza una vez por caída o corte, con seis segundos de espera y un nuevo lanzamiento completo si quedan vidas. Las reservas pendientes impiden declarar una victoria prematura. El desempate por tiempo compara vidas y después integridad; Último en pie permanece sin reloj de victoria. Las reapariciones son una regla de juego, no una continuación física de la misma vela.
+
 # TIRANTE · El pulso del viento
 
 > Documento histórico del modelo y las versiones anteriores. Las menciones a Vinext, Workers, Sites, D1 y R2 describen el alojamiento original. Para ejecutar o desplegar esta exportación Node/SQLite, sigue el README y `INSTRUCCIONES_RENDER.md` de la raíz.

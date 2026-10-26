@@ -6,15 +6,16 @@ import {closestSegments,SawStroke} from './rope.js';
 import {appearance} from './appearance.js';
 import {controlNPC} from './npc-pilot.js';
 import {cleanEquipment} from './equipment.js';
+import {PILOT_SPACING,LAUNCH_SECONDS,cleanLives,prepareLives,launchLife,loseLife,respawnLife,climbControls,comparePilots} from './battle-rules.js';
 
 export const PARTY_NPCS=Object.freeze([
-  {name:'Mateo',color:'teal',tint:'#397f80',x:6,z:0,phase:0,style:'Lee el cruce'},
-  {name:'Alma',color:'saffron',tint:'#be932d',x:-6,z:0,phase:1.35,style:'Busca tu flanco'},
-  {name:'Nico',color:'plum',tint:'#92709b',x:12,z:0,phase:2.6,style:'Presiona el hilo'}
+  {name:'Mateo',color:'teal',tint:'#397f80',x:PILOT_SPACING,z:0,phase:0,style:'Lee el cruce'},
+  {name:'Alma',color:'saffron',tint:'#be932d',x:-PILOT_SPACING,z:0,phase:1.35,style:'Busca tu flanco'},
+  {name:'Nico',color:'plum',tint:'#92709b',x:PILOT_SPACING*2,z:0,phase:2.6,style:'Presiona el hilo'}
 ]);
 export function cleanPartyOptions(value={}){
   if(!value||typeof value!=='object')value={};
-  return {rules:value.rules==='last-man'?'last-man':'timed',
+  return {rules:value.rules==='last-man'?'last-man':'timed',lives:value.rules==='last-man'?cleanLives(value.lives):3,
     profile:['breeze','gusts','strong'].includes(value.profile)?value.profile:'breeze',
     wind:[5.5,7,9,12].includes(Number(value.wind))?Number(value.wind):5.5,
     npcs:PARTY_NPCS.map((npc,i)=>{const s=value.npcs?.[i]||{};return {name:String(s.name||npc.name).replace(/[\u0000-\u001f]/g,'').trim().slice(0,24)||npc.name,...appearance({color:npc.color,...s})};})};
@@ -30,7 +31,8 @@ export class PartyCommission extends Commission{
   get aliveRivals(){return this.roster.slice(1).filter(e=>e.alive);}
   get focusEntry(){return this.roster.find(e=>e.pilot===this.rival);}
   get survivors(){return this.roster.filter(e=>e.alive);}
-  get spectating(){return this.partyMode&&this.visible&&this.roster[0]?.alive===false;}
+  get contenders(){return this.roster.filter(e=>e.lives>0);}
+  get spectating(){return this.partyMode?this.visible&&this.roster[0]?.alive===false:super.spectating;}
   get watched(){return this.roster.find(e=>e.index===this.spectatorIndex&&e.alive)||null;}
   spectateNext(){const alive=this.survivors;this.spectatorIndex=(alive.find(e=>e.index>this.spectatorIndex)||alive[0])?.index??-1;return this.watched;}
   stop(){
@@ -42,14 +44,15 @@ export class PartyCommission extends Commission{
     this.partyMode=true;this.npcCount=clamp(Math.round(Number(count)||1),1,3);this.duration=this.npcCount===1?180:240;
     this.state='preparing';this.difficulty=difficulty==='hard'?'hard':'normal';this.elapsed=0;this.remaining=this.duration;this.result=null;
     this.playerHealth=this.rivalHealth=100;this.contact=false;this.contactTime=0;this.engagements=0;this.pressure=0;this.sliding=0;this.reversals=0;this.lastHit=null;this.message='Tomando altura · 6';this.eventId=0;
-    const p=this.player;if(options.profile!==undefined)p.profile=this.options.profile;if(options.wind!==undefined)p.windSpeed=this.options.wind;p.launch();p.networkControlled=false;
+    const p=this.player;if(options.profile!==undefined)p.profile=this.options.profile;if(options.wind!==undefined)p.windSpeed=this.options.wind;prepareLives(p,this.options.lives);launchLife(p);p.networkControlled=false;
     const entry=(pilot,name,tint,index)=>({pilot,name,tint,index,alive:true,reason:'',eliminatedAt:null,stroke:new SawStroke(),aiWait:0,footworkAt:0,hit:null,cutBy:null});
     this.roster=[entry(p,'Tú','#c96343',0)];this.playerStroke=this.roster[0].stroke;
     PARTY_NPCS.slice(0,this.npcCount).forEach((npc,i)=>{
       const b=this.pool[i],side=Math.sign(npc.x),custom=this.options.npcs[i];b.configure({...DEFAULT_SETUP,...custom,...cleanEquipment(p.setup),knotsLeft:side>0?1:0,knotsRight:side<0?1:0});
-      b.anchor.set(p.anchor.x+npc.x,1.35,p.anchor.z+npc.z);b.lineCapacity=p.lineCapacity;b.windSpeed=p.windSpeed;b.profile=p.profile;b.networkControlled=false;b.launch();b.time=p.time;b.spinSign=-side;b.partyTint=npc.tint;
+      b.anchor.set(p.anchor.x+npc.x,1.35,p.anchor.z+npc.z);b.lineCapacity=p.lineCapacity;b.windSpeed=p.windSpeed;b.profile=p.profile;b.networkControlled=false;prepareLives(b,this.options.lives);launchLife(b);b.time=p.time;b.spinSign=-side;b.partyTint=npc.tint;
       this.roster.push({...entry(b,custom.name,npc.tint,i+1),homeX:b.anchor.x,homeZ:b.anchor.z,side,phase:npc.phase,targetIndex:-1,thinkIn:0});
     });
+    this.roster.forEach(e=>Object.defineProperty(e,'lives',{get:()=>e.pilot.lives}));
     this.rival=this.pool[0];this.rivalStroke=this.roster[1].stroke;this.pairLastContact=new Map();
   }
   controlNPC(e,dt){controlNPC(this,e,dt);}
@@ -57,10 +60,12 @@ export class PartyCommission extends Commission{
     if(!e.alive)return;e.alive=false;e.reason=reason;e.eliminatedAt=this.elapsed;e.pilot.sawing=false;e.pilot.setControls('hold',false);
     if(reason==='Hilo cortado')e.pilot.cutLine(e.hit?.edge,e.hit?.fraction);
     else if(e.pilot.rope.broken<0){e.pilot.rope.cutReason='ground';e.pilot.rope.breakAt(e.hit?.edge??14,e.hit?.fraction??.5);}
+    loseLife(e.pilot,this.elapsed,reason);
+    if(e.index===0||e.pilot===this.rival){this.contact=false;this.lastHit=null;}
     if(e.index===this.spectatorIndex||e.index===0)this.spectateNext();if(e.index===0)this.spectatorView=reason==='Hilo cortado'?'kite':'battle';
     const cause=e.pilot.rope.cutReason,detail=cause==='wind'?' por una ráfaga extrema':cause==='tension'?' por exceso de tensión':'';
     const text=e.index===0?(reason==='Hilo cortado'?`Se cortó tu hilo${detail}.`:'Tu volantín tocó tierra.'):reason==='Hilo cortado'?`${e.name} perdió su hilo${detail|| (by?by==='Tú'?' en el cruce contigo':` en el cruce con ${by}`:'')}.`:`${e.name} tocó tierra.`;
-    this.events.push({id:++this.eventId,time:this.elapsed,text});this.events=this.events.slice(-4);
+    this.events.push({id:++this.eventId,time:this.elapsed,text:text+(e.lives>0?` Quedan ${e.lives} vidas; vuelve en 6 s.`:' Sin vidas.')});this.events=this.events.slice(-4);
   }
   resolveContacts(dt,physical=solveRopeSystem(this.roster.map(e=>e.pilot.rope),dt)){
     this.contacts=[];this.contact=false;this.pressure=0;this.sliding=0;let focus=null;const strongest=new Map();
@@ -92,34 +97,35 @@ export class PartyCommission extends Commission{
   finish(outcome,reason){
     if(!this.partyMode)return super.finish(outcome,reason);if(!this.active)return;
     this.state='finished';this.contact=false;this.message=reason;for(const e of this.roster){e.pilot.sawing=false;e.pilot.setControls('hold',false);}
-    this.result={outcome,reason,seconds:Math.round(this.elapsed),playerHealth:Math.round(this.player.rope.integrity),rivalHealth:Math.round(Math.max(0,...this.aliveRivals.map(e=>e.pilot.rope.integrity))),rules:this.rules,winner:this.winner?.name||null,npcCount:this.npcCount,eliminated:this.npcCount-this.aliveRivals.length,standings:this.roster.map(e=>({name:e.name,tint:e.tint,alive:e.alive,health:Math.round(e.pilot.rope.integrity),reason:e.reason||'En el aire'}))};
+    this.result={outcome,reason,seconds:Math.round(this.elapsed),playerHealth:Math.round(this.player.rope.integrity),rivalHealth:Math.round(Math.max(0,...this.aliveRivals.map(e=>e.pilot.rope.integrity))),rules:this.rules,winner:this.winner?.name||null,npcCount:this.npcCount,eliminated:this.roster.slice(1).filter(e=>e.lives===0).length,standings:this.roster.map(e=>({name:e.name,tint:e.tint,alive:e.lives>0,lives:e.lives,health:Math.round(e.pilot.rope.integrity),reason:e.lives>0?`${e.lives} vidas restantes`:'Sin vidas'}))};
   }
   checkOutcome(){
-    const alive=this.survivors;
+    const alive=this.contenders;
     if(alive.length<=1){
       this.winner=alive[0]||null;
-      this.finish(!this.winner?'draw':this.winner.index===0?'win':'loss',this.winner?`${this.winner.name} ganó: último volantín en el aire.`:'Todos quedaron fuera en el mismo cruce.');return;
+      this.finish(!this.winner?'draw':this.winner.index===0?'win':'loss',this.winner?`${this.winner.name} ganó: último participante con vidas.`:'Todos agotaron sus vidas en el mismo cruce.');return;
     }
     if(this.rules==='timed'&&this.remaining<=0){
-      const best=Math.max(...alive.map(e=>e.pilot.rope.integrity)),winners=alive.filter(e=>Math.abs(e.pilot.rope.integrity-best)<1);
+      const ranked=[...alive].sort((a,b)=>comparePilots(a.pilot,b.pilot)),best=ranked[0],winners=alive.filter(e=>e.lives===best.lives&&Math.abs(e.pilot.rope.integrity-best.pilot.rope.integrity)<1);
       this.winner=winners.length===1?winners[0]:null;
-      this.finish(winners.some(e=>e.index===0)?winners.length===1?'win':'draw':'loss',this.winner?`Tiempo cumplido: ${this.winner.name} conservó más hilo.`:'Tiempo cumplido: empate entre los hilos más enteros.');
+      this.finish(winners.some(e=>e.index===0)?winners.length===1?'win':'draw':'loss',this.winner?`Tiempo cumplido: ${this.winner.name} ganó por vidas y estado del hilo.`:'Tiempo cumplido: empate en vidas y estado del hilo.');
     }
   }
   step(dt){
     if(!this.partyMode)return super.step(dt);if(!this.visible)return;
     const p=this.player;
-    for(const e of this.roster.slice(1)){const b=e.pilot;b.profile=p.profile;b.windSpeed=p.windSpeed;if(this.state==='playing'&&e.alive)this.controlNPC(e,dt);else b.setControls('hold',false);b.step(dt);}
+    for(const e of this.roster.slice(1)){const b=e.pilot;b.profile=p.profile;b.windSpeed=p.windSpeed;if(this.state==='playing'&&e.alive)this.controlNPC(e,dt);else if(this.state==='preparing')climbControls(b,this.elapsed+e.phase);else b.setControls('hold',false);b.step(dt);}
     const physical=solveRopeSystem(this.roster.map(e=>e.pilot.rope),dt);
     if(this.state==='finished')return;
     this.elapsed+=dt;
-    if(this.state==='preparing'){p.setControls('hold',false);this.message='Tomando altura · '+Math.max(1,Math.ceil(6-this.elapsed));if(this.elapsed>=6){this.state='playing';this.elapsed=0;}return;}
+    if(this.state==='preparing'){climbControls(p,this.elapsed);this.message='Tomando altura · '+Math.max(1,Math.ceil(LAUNCH_SECONDS-this.elapsed));if(this.elapsed>=LAUNCH_SECONDS){this.state='playing';this.elapsed=0;p.setControls('hold');}return;}
     this.remaining=Math.max(0,this.duration-this.elapsed);
     for(const e of this.roster)if(e.alive&&e.pilot.state!=='flying')this.eliminate(e,e.pilot.rope.broken>=0&&e.pilot.rope.cutReason!=='ground'?'Hilo cortado':'En tierra');
     this.resolveContacts(dt,physical);this.playerHealth=p.rope.integrity;
+    for(const e of this.roster)if(respawnLife(e.pilot,this.elapsed)){e.alive=true;e.reason='';e.hit=null;e.cutBy=null;e.stroke.reset();e.thinkIn=0;e.climbed=false;e.pilot.spinSign=e.side?-e.side:e.pilot.spinSign;if(e.index===0)this.spectatorView='battle';this.events.push({id:++this.eventId,time:this.elapsed,text:`${e.name} vuelve a elevar · ${e.lives} vidas.`});this.events=this.events.slice(-4);}
     if(!this.contact&&!this.focusEntry?.alive&&this.aliveRivals.length&&this.rival.rope.breakAge>2){this.rival=this.aliveRivals[0].pilot;this.lastHit=null;}
     this.rivalHealth=this.rival.rope.integrity;
-    this.message=this.contact?(p.rope.stressRatio>.8?'Tu hilo está al límite · mantén Q para descargar.':`Cruce con ${this.focusEntry.name} · tensa y da un tirón; evita llevar tu hilo al límite.`):`Quedan ${this.aliveRivals.length} de ${this.npcCount} rivales. Busca su hilo y cuida tu energía.`;
+    this.message=this.contact?(p.rope.stressRatio>.8?'Tu hilo está al límite · mantén Q para descargar.':`Cruce con ${this.focusEntry.name} · tensa y da un tirón; evita llevar tu hilo al límite.`):p.eliminated&&p.lives>0?`Vuelves en ${Math.max(1,Math.ceil(p.respawnAt-this.elapsed))} s · ${p.lives} vidas.`:p.position.y<18?'Gana altura: suelta en pulsos cortos y mantén para estabilizar. Los rivales están a 26,2 yd (24 m).':`Quedan ${this.contenders.filter(e=>e.index>0).length} rivales con vidas. Busca su hilo en altura.`;
     if(this.spectating&&this.spectatorIndex>=0&&!this.watched)this.spectateNext();
     this.checkOutcome();
   }
