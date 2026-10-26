@@ -98,6 +98,8 @@ export class OnlineGame{
       view.rope.contactPoint.fromArray(r.contactPoint).sub(new Vector3(offset[0],0,offset[2]));view.rope.breakPoint=r.breakPoint?new Vector3().fromArray(r.breakPoint).sub(new Vector3(offset[0],0,offset[2])):null;
       if(fresh){view.rope.wear.fill(0);for(const [i,n] of r.wear)view.rope.wear[i]=n;}
     }
+    // The interpolated rotation and the drawn rope share the exact bridle knot.
+    p.rope.pin();duel.rival.rope.pin();
     // Snapshot interpolation also obeys non-crossing, independently of the
     // authoritative 240 Hz solver. Camera smoothing cannot undo a collision.
     guardRopeMotion([p.rope,duel.rival.rope]);this.viewRound=d.round;this.visualOffset=offset;this.visualRenderedAt=now;

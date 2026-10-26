@@ -1,3 +1,4 @@
+import {LINE_CAPACITIES} from '../game/line-config.js';
 import {cleanSetup,idleInput,applyCommand,advance,snapshot} from './online-match.js';
 const TTL=30*60*1000, ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export class RoomError extends Error{constructor(message,status=400){super(message);this.status=status;}}
@@ -22,7 +23,7 @@ export async function handleRoom(store,body,now=Date.now(),ip='local'){
     await store.cleanup(now);const token=crypto.randomUUID()+crypto.randomUUID(),hash=await digest(token),s=body.settings||{};
     for(let attempt=0;attempt<4;attempt++){
       const code=Array.from(crypto.getRandomValues(new Uint8Array(8)),n=>ALPHABET[n%ALPHABET.length]).join('');
-      const room={code,players:[seat(body.name,hash,body.setup,now),null],settings:{capacity:[30,65,100,150].includes(s.capacity)?s.capacity:65,profile:['breeze','gusts','strong'].includes(s.profile)?s.profile:'breeze',wind:Math.max(4,Math.min(12,Number(s.wind)||6.5))},round:0,match:null,lastTick:now,carry:0,paused:null};
+      const room={code,players:[seat(body.name,hash,body.setup,now),null],settings:{capacity:LINE_CAPACITIES.includes(s.capacity)?s.capacity:65,profile:['breeze','gusts','strong'].includes(s.profile)?s.profile:'breeze',wind:Math.max(4,Math.min(12,Number(s.wind)||6.5))},round:0,match:null,lastTick:now,carry:0,paused:null};
       if(await store.insert(room))return {token,...snapshot(room,0,now)};
     }throw new RoomError('No pudimos crear la sala. Intenta de nuevo.',503);
   }

@@ -1,6 +1,6 @@
 # TIRANTE · El pulso del viento
 
-Simulador de volantines, versión 1.12.0, publicado desde este repositorio en Render.
+Simulador de volantines, versión 1.13.0, publicado desde este repositorio en Render.
 
 ## Instalación actual en Render
 
@@ -22,6 +22,15 @@ La instalación actual usa el plan gratuito, una instancia y `DATA_DIR=/tmp/tira
 - Party local contra 1–3 NPC, Rastro de luz contrarreloj y duelo online para dos personas.
 - Interfaz compacta para móvil, renderer WebGL y alternativa Canvas.
 - Servidor Node.js, base SQLite, almacenamiento de estampados y pruebas automatizadas.
+
+## Cambios de la versión 1.13.0
+
+- Estabilidad al dar hilo, recuperar con boost y tirar: la sustentación cambia la dirección del aire relativo sin añadir energía artificial, el arrastre se integra de forma estable y la tensión absorbe la recuperación brusca. Corregida la explosión numérica de los volantines más livianos con viento fuerte.
+- La punta del hilo y los tres tirantes usan el mismo punto de unión, también con amarres desiguales, nudos y durante la interpolación online.
+- Carrete de primera persona más grande, entrando por el borde inferior derecho y conectado visualmente al hilo. Sin mano. La transición del tramo cercano es solo visual; girar la cámara no mueve el anclaje ni las colisiones. La vista orbital conserva la línea física completa.
+- Carretes de **300 yd (274,3 m)** y **1000 yd (914,4 m)** en la preparación y en las salas online. Desgaste y corte cubren también las partes del hilo que superan los 150 m anteriores.
+- Campo de 2400 × 2400 m, área plana para las 1000 yd y distancias de cámara/niebla ampliadas. La cantidad de geometría del suelo no aumenta.
+- Recuperación de los récords de altura imposibles que quedaron guardados por el fallo numérico. Los ajustes y récords válidos se conservan.
 
 ## Cambios de la versión 1.12.0
 

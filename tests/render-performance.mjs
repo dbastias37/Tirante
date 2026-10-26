@@ -43,9 +43,9 @@ for(const panel of paper.panels){
 const vertexCount=paper.panels.reduce((n,p)=>n+p.geometry.attributes.position.count,0);assert.ok(vertexCount<200);
 const landscape=Object.create(Landscape.prototype);landscape.scene=new Scene();landscape.createLandscape();
 const ground=landscape.scene.children.find(m=>m.geometry?.parameters?.width===FIELD_SIZE);
-assert.ok(ground);assert.equal(ground.geometry.parameters.height,800);assert.ok(ground.geometry.index.count/3<10000);assert.ok(!landscape.scene.children.some(m=>m.isInstancedMesh));
+assert.ok(ground);assert.equal(ground.geometry.parameters.height,FIELD_SIZE);assert.ok(ground.geometry.index.count/3<10000);assert.ok(!landscape.scene.children.some(m=>m.isInstancedMesh));
 assert.ok(FOG_NEAR>150&&HORIZON_RADIUS>300&&CAMERA_FAR>FIELD_SIZE);
-for(let i=0;i<360;i++){const angle=i*Math.PI/180;assert.ok(terrainHeight(Math.sin(angle)*150,Math.cos(angle)*150)===0);}
+for(let i=0;i<360;i++){const angle=i*Math.PI/180;assert.ok(terrainHeight(Math.sin(angle)*914.4,Math.cos(angle)*914.4)===0);}
 assert.equal(renderPixelRatio(3,true),1.25);assert.equal(renderPixelRatio(1,true),1);
 
 // Observe actual Canvas draw calls: paper has one 45% compositing layer;
@@ -61,4 +61,4 @@ for(const setup of [{...DEFAULT_SETUP,tail:false},{...DEFAULT_SETUP,tail:false,s
  assert.ok(ctx.calls.filter(c=>c[0]==='stroke').every(c=>c[1]===1));assert.equal(ctx.globalAlpha,1);
 }
 delete globalThis.document;
-console.log(`PASS: ordered broadphase equivalence, ${checks}/${allPairs} bounds checks for four long lines, ${vertexCount} sail vertices, complete indexed panels, 45% WebGL/Canvas/printed paper, green field geometry and flat 150 m radius.`);
+console.log(`PASS: ordered broadphase equivalence, ${checks}/${allPairs} bounds checks for four long lines, ${vertexCount} sail vertices, complete indexed panels, 45% WebGL/Canvas/printed paper, green field geometry and flat 1,000 yd radius.`);

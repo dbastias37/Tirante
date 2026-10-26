@@ -1,3 +1,5 @@
+import {LINE_CAPACITIES} from './line-config.js';
+export {LINE_CAPACITIES} from './line-config.js';
 import {mountSettings} from './kite-shape.js';
 import {Tether} from './rope.js';
 import {flightGust,extremeGust,updateWindStress} from './line-stress.js';
@@ -10,7 +12,6 @@ export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export const mix=(a,b,t)=>a+(b-a)*t;
 export const LINE_BOOST=2.5;
 export const DOUBLE_TUG_GAP=.22;
-export const LINE_CAPACITIES=[30,65,100,150];
 export const TURN_RESPONSE=1.1;
 export function configuration(s=DEFAULT_SETUP) {
   const left=s.left-s.knotsLeft*.8, right=s.right-s.knotsRight*.8, lower=s.lower-s.knotsLower*.8;
@@ -132,27 +133,32 @@ export class KitePhysics {
     if(Math.abs(this.turnProgress)>=Math.PI*2){this.turns++;this.turnProgress-=Math.sign(this.turnProgress)*Math.PI*2;}
     if(this.heading>Math.PI*2)this.heading-=Math.PI*2;
     if(this.heading<-Math.PI*2)this.heading+=Math.PI*2;
-    this.updateAttitude(flow);
-    const alpha=this.trim.attack;
-    const q=.5*1.225*speed*speed;
-    const area=.32;
-    const cl=1.08*Math.sin(2*alpha)*(1-.42*freedom);
-    const cd=.14+1.1*Math.sin(alpha)**2+(this.setup.tail?.055:0);
-    this.aero.copy(this._lift).multiplyScalar(q*area*cl).addScaledVector(flow,q*area*cd);
-    // Half of the distributed tether load is lumped at the kite; the remainder
-    // is carried by the hand. The segmented chain supplies contact deflection.
-    this.aero.addScaledVector(flow,.25*1.225*1.1*this.equipment.thread.diameter/1000*this.lineLength*speed*speed);
+    const alpha=this.trim.attack,area=.32;
+    const cl=1.08*Math.sin(2*alpha)*(1-.42*freedom),cd=.14+1.1*Math.sin(alpha)**2+(this.setup.tail?.055:0);
     const lineMass=this.equipment.thread.mass/1000,effectiveMass=this.trim.mass+this.lineLength*lineMass/3;
-    this.force.copy(this.aero);this.force.y-=(this.trim.mass+this.lineLength*lineMass*.5)*9.81;
-    const radial=this._radial.copy(this.position).sub(this.anchor);
-    const distance=radial.length();radial.normalize();
-    const route=this.rope.loadPath(this.position,radial);
-    const extension=Math.max(distance,route)-this.lineLength, radialSpeed=this.velocity.dot(radial);
-    this.tension=extension>-.008?Math.max(0,38*extension+1.8*radialSpeed):0;
-    this.tension=Math.min(120,this.tension);
-    this.force.addScaledVector(radial,-this.tension);
-    this.velocity.addScaledVector(this.force,dt/effectiveMass);
-    this.position.addScaledVector(this.velocity,dt);
+    const gravity=(this.trim.mass+this.lineLength*lineMass*.5)*9.81;
+    const dragCoefficient=.5*1.225*area*cd+.25*1.225*1.1*this.equipment.thread.diameter/1000*this.lineLength;
+    const liftCoefficient=.5*1.225*area*cl;
+    // Substep only the light body, preserving the complete rope trajectory for
+    // the external continuous-contact solver. The angular/input clock is real.
+    const substeps=Math.max(1,Math.ceil(dt*960)),h=dt/substeps;
+    for(let i=0;i<substeps;i++){
+      const air=this._rel.copy(this.wind).sub(this.velocity),speed=air.length(),flow=this._flow.copy(air).normalize();if(speed<.001)flow.set(0,0,-1);
+      this.updateAttitude(flow);
+      this.aero.copy(this._lift).multiplyScalar(liftCoefficient*speed*speed).addScaledVector(flow,dragCoefficient*speed*speed);
+      // Exact drag decay and a lift rotation cannot inject artificial kinetic
+      // energy. Explicit quadratic lift exploded for light kites in strong air.
+      const decay=1+dragCoefficient*speed*h/effectiveMass,angle=liftCoefficient/dragCoefficient*Math.log(decay);
+      air.copy(flow).multiplyScalar(speed*Math.cos(angle)).addScaledVector(this._lift,-speed*Math.sin(angle)).multiplyScalar(1/decay);
+      this.velocity.copy(this.wind).sub(air);this.velocity.y-=gravity*h/effectiveMass;
+      const radial=this._radial.copy(this.position).sub(this.anchor),distance=radial.length();radial.normalize();
+      const route=this.rope.loadPath(this.position,radial),extension=Math.max(distance,route)-this.lineLength,radialFree=this.velocity.dot(radial);
+      // An implicit spring/damper absorbs a sudden catch without kicking the
+      // kite away. Only the strand's real extension can generate tension.
+      this.tension=extension+h*radialFree>-.008?Math.min(120,Math.max(0,(38*(extension+h*radialFree)+1.8*radialFree)/(1+(1.8*h+38*h*h)/effectiveMass))):0;
+      this.velocity.addScaledVector(radial,-this.tension*h/effectiveMass);this.position.addScaledVector(this.velocity,h);
+      this.force.copy(this.aero).addScaledVector(radial,-this.tension);this.force.y-=gravity;
+    }
     this.bend+=((1-Math.exp(-this.tension/1.1))-this.bend)*Math.min(1,dt*12);
     this.maxHeight=Math.max(this.maxHeight,this.position.y);
     if(this.position.y>5&&Math.abs(this.spin)<.2&&this.tension>.08)this.steadyTime+=dt;

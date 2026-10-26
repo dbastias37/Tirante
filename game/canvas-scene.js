@@ -4,7 +4,7 @@ import {cachedSailArt,texturedTriangle} from './sail-art.js';
 import {OrbitCamera} from './orbit-camera.js';
 import {spectatorView,onboardFrame} from './spectator-camera.js';
 import {ArticulatedTail} from './tail.js';
-import {reelViewport} from './reel-view.js';
+import {reelViewport,canvasReelOutlet,foregroundLine} from './reel-view.js';
 import {equipmentStats} from './equipment.js';
 import {drawCanvasTrail} from './trail-view.js';
 import {frameDuel,positionView} from './duel-camera.js';
@@ -95,7 +95,7 @@ export class CanvasLandscape {
     if(duel.contact){const point=this.project(duel.contactPoint);if(point.z<1){c.strokeStyle='#ffe2a0';c.lineWidth=2;c.beginPath();c.arc(point.x,point.y,6+Math.sin(time*14)*2,0,Math.PI*2);c.stroke();}}
   }
   drawTether(p,color){
-    const r=p.rope,c=this.ctx,points=r.points.map(q=>this.project(q));
+    const r=p.rope,c=this.ctx,points=(p===this.physics&&this.reelLinePoints?this.reelLinePoints:r.points).map(q=>this.project(q));
     for(let i=0;i<points.length-1;i++){
       if(i===r.broken)continue;const a=points[i],b=points[i+1];if(a.z>1||b.z>1)continue;
       const worn=r.broken<0?r.wearAt(i):0,contact=r.contactAge<.1&&Math.abs(i-r.contactEdge)<2;
@@ -115,16 +115,17 @@ export class CanvasLandscape {
     const equipment=equipmentStats(this.setup);c.fillStyle=equipment.reel.color;c.beginPath();c.ellipse(37,-12,22,47,-.05,0,Math.PI*2);c.fill();c.strokeStyle=equipment.reel.rim;c.lineWidth=2.5;c.stroke();for(let i=0;i<equipment.reel.holes;i++){const angle=i/equipment.reel.holes*Math.PI*2+threadShift*.02;c.fillStyle='#63513a';c.beginPath();c.ellipse(37+Math.cos(angle)*13,-12+Math.sin(angle)*29,equipment.reel.holes===8?3.5:4.4,equipment.reel.holes===8?6:8,-.05,0,Math.PI*2);c.fill();}
     c.fillStyle='#735538';c.beginPath();c.ellipse(37,-12,6,12,-.05,0,Math.PI*2);c.fill();
     c.restore();
-    return {x:x-5*scale,y:y-43*scale};
+    return canvasReelOutlet(this.width,this.height,time);
   }
   render(dt,mode,paused){
     const p=this.physics,intro=mode==='intro',time=p.time,inDuel=!intro&&!!this.duel?.visible;const view=spectatorView(p,this.duel),spectating=view.active,watched=view.pilot,onboard=!intro&&view.onboard;const orbital=!intro&&!onboard&&(this.orbit.active||view.orbital);if(!orbital&&!onboard)positionView(this.camera,inDuel,dt,this.duel?.partyMode?this.duel.npcCount:1);const orbitFrame=onboard?onboardFrame(this.camera,p,dt):orbital?this.orbit.frame(this.camera,watched?.position||p.position,dt):null,duelFrame=inDuel&&!orbital&&!onboard?frameDuel(this.camera,this.duel):null;this.tugOffset=Math.sin(clamp((time-p.lastTug)/.2,0,1)*Math.PI)*12;
     if(intro){this.kitePosition.set((this.width<760?1.7:4.3)+Math.sin(time*.47)*.25,p.profile==='calm'?.5:(this.width<760?7.4:6.1)+Math.sin(time*.7)*.2,-14);this.kiteRotation.setFromEuler(new Euler(-.38,.1,Math.sin(time*.66)*.08-.13));this.kiteScale=1.45;}
-    else{this.kitePosition.copy(p.position);this.kiteRotation.copy(p.orientation);this.kiteScale=1;if(p.state==='ready'||p.state==='grounded')this.kiteRotation.setFromEuler(new Euler(-.3,0,.17));}
+    else{this.kitePosition.copy(p.position);this.kiteRotation.copy(p.orientation);this.kiteScale=1;}
     if(intro)this.tmp.set(0,3.8,-24);else if(orbitFrame)this.tmp.copy(orbitFrame.target);else if(this.follow){if(duelFrame)this.tmp.copy(duelFrame.target);else{this.tmp.copy(p.position);this.tmp.y+=p.state==='flying'?-.7:.8;}}else this.tmp.set(Math.sin(this.yaw)*Math.cos(this.pitch),Math.sin(this.pitch),-Math.cos(this.yaw)*Math.cos(this.pitch)).add(this.camera.position);
     this.targetCamera.position.copy(this.camera.position);this.targetCamera.lookAt(this.tmp);if(orbital||onboard)this.camera.quaternion.copy(this.targetCamera.quaternion);else this.camera.quaternion.slerp(this.targetCamera.quaternion,1-Math.exp(-dt*(intro?2:3.5)));
     this.camera.fov=mix(this.camera.fov,intro?50:orbitFrame?orbitFrame.fov:duelFrame?(this.follow?duelFrame.fov:74):this.zoom?35:this.width<760?63:54,1-Math.exp(-dt*6));this.camera.updateProjectionMatrix();this.camera.updateMatrixWorld();
     if(this.inDuel!==inDuel){this.inDuel=inDuel;this.resize();}
+    this.reelLinePoints=!intro&&!orbital&&!spectating?foregroundLine(p.rope,this.camera,this.width,this.height,canvasReelOutlet(this.width,this.height,time),this.reelLineCache||=[]):null;
     const c=this.ctx;c.setTransform(this.ratio,0,0,this.ratio,0,0);this.drawSky(time);if(!intro){drawCanvasTrail(this,this.trail,time);this.drawRival(time);}
     const junction=onboard?this.local(0,0,0):this.drawKite(time,intro),end=this.project(junction);let start={x:this.width*.5,y:this.height*1.06};if(!intro)start={x:(this.width<760?this.width*.87:this.width*.84)-5*(this.width<760?.7:1),y:this.height*(this.width<760?.68:.85)-43*(this.width<760?.7:1)+this.tugOffset};
     if(intro&&end.z<1){c.beginPath();c.moveTo(start.x,start.y);c.quadraticCurveTo((start.x+end.x)*.5,(start.y+end.y)*.5+20,end.x,end.y);c.strokeStyle='#f4ebcb';c.lineWidth=1;c.stroke();}

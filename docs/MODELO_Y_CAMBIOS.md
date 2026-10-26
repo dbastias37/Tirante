@@ -209,3 +209,14 @@ El carrete se dibuja sin mano en un segundo viewport WebGL, con cámara e ilumin
 Al cortar se conserva posición y dirección, limitando la velocidad a 8 m/s. La hoja recoge el 65 % de la velocidad del aire en este modelo reducido, con variación lateral máxima de 4 m/s² y vertical acotada. No se modifica el reloj ni el paso físico. Se conservan sensibilidad a masa, picada inicial, aleteo y aterrizaje.
 
 El plano exterior tiene un hueco de 800 × 800 m: deja de superponerse con el terreno. Los últimos 40 m del borde llegan suavemente a altura cero. El plano cercano de cámara pasa de 0,05 a 0,15 m; camino y sombra usan desplazamiento de profundidad. Las pruebas lanzan rayos contra ambos suelos para comprobar una sola intersección por punto interior/exterior.
+
+
+## 1.13.0 · Soltada estable y conexión de extremos
+
+Se reprodujo una divergencia con 22 g, sin cola, ráfagas de 12 m/s: la integración explícita anterior superaba 420 m/s antes de un segundo. La nueva integración aplica decaimiento cuadrático de arrastre y rotación por sustentación al aire relativo. Una fuerza de sustentación perpendicular no incrementa su energía. El cuerpo usa subpasos de hasta 1/960 s y tensión radial implícita; el reloj de controles y el sistema de hilos mantienen 240 Hz y conservan el recorrido completo para las colisiones continuas. Las pruebas de maniobras y cortes por tensión siguen aprobando. El recorrido de Rastro permanece alcanzable y ahora su secuencia de prueba gana Oro.
+
+`Tether.endpoint()` usa `bridleJunction(trim)`, igual que WebGL, Canvas y la preparación. Esto incorpora el centro de los amarres y el desbalance por longitudes, que antes diferían del cálculo del extremo físico. Online vuelve a fijar el extremo al nudo de la orientación interpolada antes de aceptar el movimiento: interpolar coordenadas de dos extremos rotados no equivale a interpolar la rotación.
+
+El carrete vuelve al primer plano, parcialmente encuadrado por el borde de la pantalla. Su salida se proyecta hacia la cámara principal. `foregroundLine` interpola la representación de los primeros dos metros hacia esa salida y mantiene intactos el nudo del volantín y el tramo desprendido después de un corte. No altera puntos, velocidad, anclaje o colisiones físicos. La vista orbital y los hilos de los rivales muestran los puntos físicos sin esa transición.
+
+`line-config.js` comparte capacidades métricas exactas (incluidas 274,32 y 914,4 m), resolución de desgaste de 0,125 m y validación del récord. El búfer de desgaste alcanza toda la capacidad máxima; antes terminaba a 150 m. La geometría del suelo mantiene 64 × 64 divisiones y 18 árboles, con campo de 2400 m, radio plano de 960 m, cámara a 4000 m y niebla después de 1050 m.

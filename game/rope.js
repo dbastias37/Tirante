@@ -1,4 +1,6 @@
 import {Vector3} from './vendor/three.module.js';
+import {bridleJunction} from './kite-shape.js';
+import {WEAR_STEP,WEAR_SAMPLES} from './line-config.js';
 import {LINE_STRENGTH} from './line-stress.js';
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const V=()=>new Vector3();
@@ -17,12 +19,12 @@ export function closestSegments(a,b,c,d){
 // Compliance/radius and fracture work are game calibration, not measured cotton.
 export class Tether {
   constructor(owner){this.owner=owner;this.end=V();this.contactPoint=V();this.reset();}
-  endpoint(){const p=this.owner;return this.end.set(p.trim.bias*.045,-.06+(p.trim.lower-52)*.004,.23).applyQuaternion(p.orientation).add(p.position);}
+  endpoint(){const p=this.owner;return this.end.fromArray(bridleJunction(p.trim)).applyQuaternion(p.orientation).add(p.position);}
   reset(){
     const end=this.endpoint(),p=this.owner,n=ROPE_SEGMENTS;
     this.points=Array.from({length:n+1},(_,i)=>p.anchor.clone().lerp(end,i/n));
     this.previous=this.points.map(q=>q.clone());this.velocities=this.points.map(V);this.weights=this.points.map((_,i)=>i===0||i===n?0:1);
-    this.rest=Array(n).fill(p.lineLength/n);this.lambda=Array(n).fill(0);this.wear=new Float64Array(1201);this.broken=-1;this.breakPoint=null;
+    this.rest=Array(n).fill(p.lineLength/n);this.lambda=Array(n).fill(0);this.wear=new Float64Array(WEAR_SAMPLES);this.broken=-1;this.breakPoint=null;
     this.contactLoad=0;this.contactEdge=-1;this.feedDelta=0;this.lastLength=p.lineLength;this.integrity=100;this.contactAge=100;this.breakAge=100;
     this.stressLoad=0;this.strength=p.equipment?.thread.strength||LINE_STRENGTH;this.stressRatio=0;this.overload=0;this.jamStrain=0;this.jamTime=0;this.shock=0;this.cutReason='';
   }
@@ -67,11 +69,11 @@ export class Tether {
     return this.owner.anchor.distanceTo(this.contactPoint)+this.contactPoint.distanceTo(end);
   }
   materialAt(edge,fraction){return Math.max(0,this.owner.lineLength*(1-(edge+fraction)/ROPE_SEGMENTS));}
-  wearAt(edge,fraction=.5){return this.wear[Math.min(1200,Math.round(this.materialAt(edge,fraction)/.125))]||0;}
+  wearAt(edge,fraction=.5){return this.wear[Math.min(this.wear.length-1,Math.round(this.materialAt(edge,fraction)/WEAR_STEP))]||0;}
   abrade(edge,fraction,work){
     if(work<=0||this.broken>=0)return false;
-    const coordinate=this.materialAt(edge,fraction)/.125,index=Math.round(coordinate);
-    for(let k=Math.max(0,index-1);k<=Math.min(1200,index+1);k++){
+    const coordinate=this.materialAt(edge,fraction)/WEAR_STEP,index=Math.round(coordinate);
+    for(let k=Math.max(0,index-1);k<=Math.min(this.wear.length-1,index+1);k++){
       const amount=work/(3.6*(this.owner.equipment?.thread.wear||1))*Math.max(0,1-Math.abs(k-coordinate)/1.25);
       this.wear[k]=Math.min(1,this.wear[k]+amount);this.integrity=Math.min(this.integrity,100*(1-this.wear[k]));
     }

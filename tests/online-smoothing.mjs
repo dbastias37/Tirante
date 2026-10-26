@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {OnlineGame} from '../game/online.js';
+import {Vector3} from '../game/vendor/three.module.js';
 import {KitePhysics} from '../game/physics.js';
 import {Commission} from '../game/commission.js';
 import {createMatch,packMatch,snapshot} from '../server/online-match.js';
@@ -23,3 +24,11 @@ for(const slot of [0,1]){
  for(let frame=1;frame<=4;frame++){client.latest=make(frame+3,2);client.latest.code='IJKLMNPQ';client.render(view.player,view,170+frame*1000);assert.ok(Math.abs(view.player.position.y-initial.y-frame-3)<1e-7,'A throttled tab must catch up instead of freezing at every packet');}
 }
 console.log('PASS: jitter-free packet retargeting for both seats, line continuity, smooth paper animation, room/round resets and background-tab catch-up.');
+
+// Slerping orientation is not the same as lerping a rotated endpoint. The
+// rendered line must be repinned to the interpolated bridle knot each frame.
+const rotatingRoom={...room,players:[{...room.players[0],setup:{anchorLeft:0,anchorRight:95,knotsRight:4}},room.players[1]]},match=createMatch(rotatingRoom),client=Object.create(OnlineGame.prototype),view=new Commission(new KitePhysics());client.interval=100;
+rotatingRoom.match=packMatch(match);client.latest=snapshot(rotatingRoom,0,0);client.render(view.player,view,0);
+match.player.heading=2.3;match.player.updateAttitude(new Vector3(.1,0,-1).normalize());match.player.rope.pin();rotatingRoom.match=packMatch(match);client.latest=snapshot(rotatingRoom,0,100);client.render(view.player,view,10);
+for(const time of [30,50,70,90,110]){client.render(view.player,view,time);for(const pilot of [view.player,view.rival])assert.ok(pilot.rope.points.at(-1).distanceTo(pilot.rope.endpoint())<1e-8,'Online interpolation keeps the line attached to the common bridle knot');}
+console.log('PASS: rotating asymmetric bridles stay joined during online interpolation.');

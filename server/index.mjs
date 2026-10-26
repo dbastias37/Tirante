@@ -39,7 +39,7 @@ export function createApplication({dataDir=resolve(ROOT,'data'),trustProxy=false
     res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');res.setHeader('X-Frame-Options','SAMEORIGIN');
     try{
       const url=new URL(req.url,'http://localhost'),path=url.pathname,method=req.method;
-      if(path==='/healthz'&&(method==='GET'||method==='HEAD')){rooms.health();json(res,200,{ok:true,version:'1.12.0',storage:'sqlite+files'});return;}
+      if(path==='/healthz'&&(method==='GET'||method==='HEAD')){rooms.health();json(res,200,{ok:true,version:'1.13.0',storage:'sqlite+files'});return;}
       if(path==='/api/pvp'){
         if(method!=='POST')throw new HttpError(405,'Usa POST.');sameOrigin(req);
         if(req.headers['content-type']?.split(';')[0]!=='application/json')throw new HttpError(415,'Se requiere JSON.');

@@ -8,7 +8,7 @@ import {equipmentStats} from './equipment.js';
 import {createReelModel,disposeModel} from './equipment-models.js';
 import {TrailView,drawCanvasTrail} from './trail-view.js';
 import {frameDuel,positionView} from './duel-camera.js';
-import {reelViewport} from './reel-view.js';
+import {reelViewport,foregroundLine} from './reel-view.js';
 import * as THREE from './vendor/three.module.js';
 import {clamp,mix,configuration} from './physics.js';
 import {PAPER_OPACITY,FIELD_SIZE,CAMERA_NEAR,CAMERA_FAR,SKY_RADIUS,HORIZON_RADIUS,FOG_NEAR,FOG_FAR,renderPixelRatio,terrainHeight} from './render-settings.js';
@@ -157,26 +157,33 @@ export class Landscape {
   createReel(){
     this.reelScene=new THREE.Scene();this.reelCamera=new THREE.PerspectiveCamera(48,1,.1,10);this.reelCamera.position.set(0,.05,3.2);this.reelCamera.lookAt(0,0,0);
     this.reelScene.add(new THREE.HemisphereLight(0xfff4da,0x536851,2.7));const light=new THREE.DirectionalLight(0xffead1,3);light.position.set(-3,5,4);this.reelScene.add(light);
-    this.reelRig=new THREE.Group();this.reelRig.rotation.set(.12,.65,-.16);this.reelScene.add(this.reelRig);this.spool=new THREE.Group();this.reelRig.add(this.spool);this.configureReel(this.physics.setup);
+    this.reelRig=new THREE.Group();this.reelRig.rotation.set(.12,1.03,-.25);this.reelScene.add(this.reelRig);this.spool=new THREE.Group();this.reelRig.add(this.spool);this.reelOutlet=new THREE.Object3D();this.reelRig.add(this.reelOutlet);this.configureReel(this.physics.setup);
   }
-  renderReel(dt,paused){
+  prepareReel(dt,paused){
     const p=this.physics,box=reelViewport(this.width,this.height);
     if(!paused&&p.action!=='hold')this.spool.rotation.z+=dt*(p.action==='reel'?3:-3)*(p.boost?2.5:1);
     this.reelRig.position.y=-Math.sin(clamp((p.time-p.lastTug)/.2,0,1)*Math.PI)*.06;
-    const r=this.renderer;r.autoClear=false;r.clearDepth();r.setViewport(box.x,this.height-box.y-box.size,box.size,box.size);r.render(this.reelScene,this.reelCamera);r.setViewport(0,0,this.width,this.height);r.autoClear=true;
+    this.reelScene.updateMatrixWorld(true);this.reelCamera.updateMatrixWorld(true);
+    const projected=this.reelOutlet.getWorldPosition(new THREE.Vector3()).project(this.reelCamera);
+    const outlet={x:box.x+(projected.x*.5+.5)*box.size,y:box.y+(.5-projected.y*.5)*box.size};
+    this.reelLinePoints=foregroundLine(p.rope,this.camera,this.width,this.height,outlet,this.reelLineCache||=[]);
+  }
+  renderReel(){
+    const box=reelViewport(this.width,this.height),r=this.renderer;
+    r.autoClear=false;r.clearDepth();r.setViewport(box.x,this.height-box.y-box.size,box.size,box.size);r.render(this.reelScene,this.reelCamera);r.setViewport(0,0,this.width,this.height);r.autoClear=true;
   }
   resize(){this.width=window.innerWidth;this.height=window.innerHeight;this.camera.aspect=this.width/this.height;this.camera.updateProjectionMatrix();this.renderer.setSize(this.width,this.height,false);}
-  configureReel(s){const key=[s.reelType,s.bearingType,s.lineType].join('/');if(this.reelKey===key)return;this.reelKey=key;if(this.reelModel){this.spool.remove(this.reelModel);disposeModel(this.reelModel);}const e=equipmentStats(s);this.reelModel=createReelModel(e.reel,e.bearing,e.thread);this.reelModel.scale.setScalar(.88*(e.reel.diameter/20.3)**.3);this.spool.add(this.reelModel);}
+  configureReel(s){const key=[s.reelType,s.bearingType,s.lineType].join('/');if(this.reelKey===key)return;this.reelKey=key;if(this.reelModel){this.spool.remove(this.reelModel);disposeModel(this.reelModel);}const e=equipmentStats(s);this.reelModel=createReelModel(e.reel,e.bearing,e.thread);this.reelModel.scale.setScalar(.88*(e.reel.diameter/20.3)**.3);this.spool.add(this.reelModel);this.reelOutlet.position.set(0,.869*this.reelModel.scale.x,0);}
   configure(s){this.kite.configure(s);this.configureReel(s);}
   drag(dx,dy){if(spectatorView(this.physics,this.duel).onboard)return;if(this.orbit.active||spectatorView(this.physics,this.duel).orbital){this.orbit.drag(dx,dy);return;}if(this.follow){this.camera.getWorldDirection(this.forward);this.yaw=Math.atan2(this.forward.x,-this.forward.z);this.pitch=Math.asin(this.forward.y);}this.follow=false;this.yaw-=dx*.0035;this.pitch=clamp(this.pitch+dy*.003,-.35,1.4);}
   updateTether(line,p){
-    const r=p.rope,attr=line.geometry.attributes.position,colors=line.geometry.attributes.color,fray=line.userData.fray.geometry.attributes.position;let index=0,fi=0;
+    const r=p.rope,points=p===this.physics&&this.reelLinePoints?this.reelLinePoints:r.points,attr=line.geometry.attributes.position,colors=line.geometry.attributes.color,fray=line.userData.fray.geometry.attributes.position;let index=0,fi=0;
     const tint=new THREE.Color();
     for(let i=0;i<r.points.length-1;i++){
       if(i===r.broken)continue;
       const wear=r.broken<0?r.wearAt(i):0,contact=r.contactAge<.1&&Math.abs(i-r.contactEdge)<2;
       tint.set(wear>.25?0xdf9a5e:contact?0xffd78e:p===this.physics?0xf8efc8:p.partyTint||0x64aaa8);
-      for(const id of [i,i+1]){this._temp.copy(r.points[id]);attr.setXYZ(index,this._temp.x,this._temp.y,this._temp.z);colors.setXYZ(index++,tint.r,tint.g,tint.b);}
+      for(const id of [i,i+1]){this._temp.copy(points[id]);attr.setXYZ(index,this._temp.x,this._temp.y,this._temp.z);colors.setXYZ(index++,tint.r,tint.g,tint.b);}
       if(wear>.2&&fi<116){this._temp.copy(r.points[i]).lerp(r.points[i+1],.5);const q=this._temp,size=.025+wear*.035;fray.setXYZ(fi++,q.x-size,q.y+size,q.z);fray.setXYZ(fi++,q.x,q.y,q.z);fray.setXYZ(fi++,q.x,q.y,q.z);fray.setXYZ(fi++,q.x+size,q.y+size*.6,q.z+.02);}
     }
     attr.needsUpdate=true;colors.needsUpdate=true;line.geometry.setDrawRange(0,index);fray.needsUpdate=true;line.userData.fray.geometry.setDrawRange(0,fi);line.userData.fray.visible=line.visible;
@@ -188,7 +195,7 @@ export class Landscape {
     if(this.inDuel!==inDuel){this.inDuel=inDuel;this.renderer.setPixelRatio(renderPixelRatio(window.devicePixelRatio,inDuel));}
     for(const cloud of this.clouds)cloud.position.x=cloud.userData.baseX+Math.sin(p.time*.008)*9;
     if(intro){this.kite.group.position.set((this.width<760?1.7:4.3)+Math.sin(p.time*.47)*.25,p.profile==='calm'?.5:(this.width<760?7.4:6.1)+Math.sin(p.time*.7)*.2,-14);this.kite.group.rotation.set(-.38,.1,Math.sin(p.time*.66)*.08-.13);this.kite.group.scale.setScalar(1.45);}
-    else{this.kite.group.position.copy(p.position);this.kite.group.quaternion.copy(p.orientation);this.kite.group.scale.setScalar(1);if(p.state==='ready'||p.state==='grounded'){this.kite.group.rotation.set(-.3,0,.17);}}
+    else{this.kite.group.position.copy(p.position);this.kite.group.quaternion.copy(p.orientation);this.kite.group.scale.setScalar(1);}
     this.kite.group.visible=!onboard;this.kite.animate(p.time,intro?.45:p.bend,p.wind.length(),intro?null:p);
     this.kiteShadow.position.set(this.kite.group.position.x,.05+terrainHeight(this.kite.group.position.x,this.kite.group.position.z),this.kite.group.position.z);this.kiteShadow.material.opacity=.15/(1+this.kite.group.position.y*.3);this.kiteShadow.scale.setScalar(1+this.kite.group.position.y*.07);
     if(intro)this._temp.set(this.width<760?0:0,3.8,-24);
@@ -198,6 +205,7 @@ export class Landscape {
     this.targetCamera.position.copy(this.camera.position);this.targetCamera.lookAt(this._temp);
     if(orbital||onboard)this.camera.quaternion.copy(this.targetCamera.quaternion);else this.camera.quaternion.slerp(this.targetCamera.quaternion,1-Math.exp(-dt*(intro?2:3.5)));
     const fov=intro?50:orbitFrame?orbitFrame.fov:duelFrame?(this.follow?duelFrame.fov:74):(this.zoom?35:this.width<760?63:54);this.camera.fov=mix(this.camera.fov,fov,1-Math.exp(-dt*6));this.camera.updateProjectionMatrix();
+    this.reelLinePoints=null;if(!intro&&!orbital&&!spectating)this.prepareReel(dt,paused);
     this.scene.updateMatrixWorld();
     this.worldEnd.copy(this.kite.junction);this.kite.group.localToWorld(this.worldEnd);
     if(intro)this.worldStart.set(0,.4,1);
@@ -210,7 +218,7 @@ export class Landscape {
       if(visible){visual.kite.group.position.copy(b.position);visual.kite.group.quaternion.copy(b.orientation);visual.kite.animate(p.time,b.bend,b.wind.length(),b);visual.pilot.position.set(b.anchor.x,0,b.anchor.z);this.updateTether(visual.rope,b);}
     });if(this.clashGlow.visible)this.clashGlow.position.copy(this.duel.contactPoint);
     this.trailView.update(!intro?this.trail:null,this.camera,p.time);
-    this.sky.position.copy(this.camera.position);this.renderer.render(this.scene,this.camera);if(!intro&&!orbital&&!spectating)this.renderReel(dt,paused);
+    this.sky.position.copy(this.camera.position);this.renderer.render(this.scene,this.camera);if(!intro&&!orbital&&!spectating)this.renderReel();
     this.screenPoint.copy(this.kite.group.position).project(this.camera);this.nosePoint.set(0,.4,0);this.kite.group.localToWorld(this.nosePoint);this.nosePoint.project(this.camera);
     const projected=q=>{const o=q.clone().project(this.camera);return {x:(o.x*.5+.5)*this.width,y:(.5-o.y*.5)*this.height,behind:o.z>1,visible:o.z<1&&Math.abs(o.x)<.95&&Math.abs(o.y)<.95};};
     return {trail:this.trail?.active&&this.trail.target?projected(this.trail.target):null,rivals:rivalVisible?rivals.map(b=>projected(b.position)):[],rival:rivalVisible?projected(this.duel.rival.position):null,clash:this.duel?.contact?projected(this.duel.contactPoint):null,x:(this.screenPoint.x*.5+.5)*this.width,y:(-.5*this.screenPoint.y+.5)*this.height,visible:this.screenPoint.z<1&&Math.abs(this.screenPoint.x)<.94&&Math.abs(this.screenPoint.y)<.95,angle:Math.atan2((this.nosePoint.x-this.screenPoint.x)*this.width,(this.nosePoint.y-this.screenPoint.y)*this.height)*180/Math.PI,size:Math.abs((this.nosePoint.y-this.screenPoint.y)*this.height)};
