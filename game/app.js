@@ -105,6 +105,7 @@ function showTrailResult(){
 }
 function viewPilot(){
   if(!duel.visible)return;
+  if(spectator().active)duel.spectatorView='battle';
   const rivals=duel.rivals||[duel.rival];landscape.pilotFocus=(Number.isInteger(landscape.pilotFocus)?landscape.pilotFocus:-1)+1;
   if(landscape.pilotFocus>=rivals.length){landscape.pilotFocus=-1;landscape.orbit.active=false;}
   else{landscape.orbit.active=true;landscape.orbit.reset();landscape.orbit.distance=3.3;landscape.orbit.pitch=.09;const p=rivals[landscape.pilotFocus];landscape.orbit.yaw=Math.atan2(p.position.x-p.anchor.x,p.position.z-p.anchor.z)+.5;}

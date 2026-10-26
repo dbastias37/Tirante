@@ -1,5 +1,19 @@
 # Validación de la exportación
 
+## Hilo natural y contrincantes vestidos · 1.15.0 · 26 de octubre de 2026
+
+- `npm run build`: 74 módulos comprobados. `npm test`: batería completa aprobada, incluidas diez pruebas del servidor. Tras agrupar piezas estáticas del personaje se repitió `pilot-model` y el build; tras ajustar el cambio de cámara de espectador se repitió `game-flow` y el build.
+- `loose-thread`: nueve combinaciones de pantalla/altura conservan el origen en el carrete, el extremo de los tirantes y la progresión hacia arriba. Una cuerda físicamente recta permanece recta en pantalla, sin el arco impuesto de 1.14. Siguen aprobadas las hebras cortadas, los 72 casos de soltada y las capacidades de 300/1000 yardas.
+- `pilot-model`: las tres variantes tienen menos de 7.500 triángulos, geometría finita y altura humana. El punto de salida del carrete coincide con el anclaje físico incluso al girar, caminar y quedar eliminado. Se comprueban recogida, tirón, pasos por desplazamiento, relajación al caer y congelación al pausar.
+- La alternativa Canvas dibuja las mismas mallas con profundidad por píxel. Cambiar el orden de las caras conserva la imagen dentro de una tolerancia mínima. Las manos, los zapatos y el carrete se agrupan por material; la primera variante queda en 32 lotes de dibujo. Una muestra local de 60 cuadros aislados del personaje tardó 6,13 ms por cuadro de media; no equivale a FPS del juego ni a una medición en un teléfono.
+- Las pruebas de Party, Duelo y online pasan con los 18 m iniciales. Seis rondas naturales con uno, dos o tres NPC terminaron con resultados válidos y 9–84 contactos físicos. Se mantienen vidas, espera de seis segundos, espectador y sincronización. La regresión de aserruchado acumula los cambios de sentido de toda la ronda, porque el contador de una vida se reinicia al reaparecer.
+
+El commit `71508ba96ae80678e7100473d1cd79413538290e` llegó a `live` en Render. `/healthz` confirmó 1.15.0 y nueve archivos publicados (modelos, cabezas, renderer, hilo, reglas, escenas, interfaz y HTML) coincidieron byte por byte con el repositorio.
+
+Revisión web: Party con Mateo, Alma y Nico, tres vidas y carrete de 1000 yd. «Ver jugadores» recorrió los tres personajes dentro de la partida; C regresó a primera persona y Q soltó hilo normalmente. Se observaron ropa, manos/carretel, mirada y elevación de los NPC. Capturas reales: [contrincante en la partida](tirante-1-15-jugadores.jpg) e [hilo fino en vuelo](tirante-1-15-hilo.jpg). El HTML publicado muestra 19,7 yd (18 m) entre puestos.
+
+El navegador de comprobación tiene WebGL deshabilitado y usa Canvas. La geometría, materiales y transformaciones de WebGL se verifican por pruebas, pero no se ha realizado revisión visual en GPU ni se afirma una tasa de FPS.
+
 ## Hilo flexible, distancia y vidas · 1.14.0 · 26 de octubre de 2026
 
 - `npm run build`: 70 módulos comprobados. `npm test`: batería completa aprobada, incluidas diez pruebas HTTP/SQLite. Tras el ajuste visual final se repitieron `loose-thread`, los 72 escenarios de `payout-stability`, las diez pruebas del servidor y el build: todo aprobado.
