@@ -14,7 +14,7 @@ export function createReelModel(spec=REELS[0],bearing=BEARINGS[1],thread=THREADS
   wooden(g,new T.ExtrudeGeometry(front,{depth:.055,bevelEnabled:true,bevelSegments:1,steps:1,bevelSize:.008,bevelThickness:.008,curveSegments:20}),spec.color,[0,0,.33]);
   wooden(g,ring(1,.79,.06),spec.color,[0,0,-.39]);
   wooden(g,ring(.86,.80,.66),spec.color,[0,0,-.33]);
-  for(const z of [-.37,.37])part(g,torus(.946,.014),spec.rim,[0,0,z]);
+  for(const z of [-.405,.405])part(g,new T.TorusGeometry(.974,.014,6,64),spec.rim,[0,0,z]);
   // Thin wound strands on the outside; the hollow drum and rear handle remain
   // open and visible when the carousel turns through the reverse view.
   for(let i=0;i<25;i++)part(g,torus(.869,.009),i%3?'#ece5d5':'#c8bea6',[0,0,-.29+i*.024]);
