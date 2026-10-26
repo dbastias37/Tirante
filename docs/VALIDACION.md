@@ -1,5 +1,23 @@
 # Validación de la exportación
 
+## Hilo flexible, distancia y vidas · 1.14.0 · 26 de octubre de 2026
+
+- `npm run build`: 70 módulos comprobados. `npm test`: batería completa aprobada, incluidas diez pruebas HTTP/SQLite. Tras el ajuste visual final se repitieron `loose-thread`, los 72 escenarios de `payout-stability`, las diez pruebas del servidor y el build: todo aprobado.
+- Las hebras cortadas solo transmiten tracción: no empujan sus segmentos comprimidos como varillas. Se refinan únicamente después del corte, con un máximo de 320 segmentos; los hilos vivos mantienen la resolución física y el coste de contactos anteriores. Se comprueban conservación de longitud, punto exacto de fractura, separación de las puntas, suelo y estados finitos durante ocho segundos en hilos de 30, 150, 274,32 y 914,4 m. El trazado curvo no une los dos lados cortados.
+- Primera persona: nueve combinaciones de pantalla y altura comprueban salida exacta desde el carrete, progresión hacia arriba, extremo del tirante inalterado y ausencia de un codo brusco por perspectiva. En estos casos el cambio entre segmentos proyectados queda por debajo de 18 grados. No se modifica la cuerda física ni se conecta la hebra liberada.
+- Puestos a 24 m, cuatro veces la separación anterior; ocho segundos de preparación. Los NPC elevan primero y calculan el alcance hasta el hilo rival desde su propio puesto, con los mismos controles, energía y fuerzas del jugador. La separación mínima durante sus movimientos es de 18 m.
+- `battle-lives`: tres vidas en Duelo y Party normal; 3/5/10 en Último en pie; una pérdida por caída o corte; reaparición a los seis segundos con nuevo hilo y energía; ninguna victoria prematura mientras haya reservas pendientes. Último en pie sigue activo a los 900 segundos si quedan contendientes. El desempate con reloj prioriza vidas y después integridad.
+- Persistencia online: el tiempo de reaparición y las vidas sobreviven a guardar/restaurar. Un número de lanzamiento evita interpolar el hilo nuevo desde la posición del anterior, incluso si se pierde el paquete que avisaba del corte. Ambos asientos conservan estados equivalentes.
+- Seis muestras naturales con uno o tres NPC, viento de 5,5/9/12 m/s y jugador que eleva a 32 m antes de mantener: primer contacto entre 25,7 y 150,6 segundos, a alturas entre 8,83 y 19,65 m. Son escenarios deterministas, no una altura o duración garantizada para todas las maniobras. Las pruebas conservan los cruces físicos y la posibilidad de perder al aserruchar.
+
+Revisión en la web: se eligieron 10 y después 5 vidas en Último en pie. Con tres NPC se observó pérdida y reposición de un rival y del jugador; al aterrizar, el marcador mostró «2 / 5 vidas», «ESPECTANDO» y «Nuevo lanzamiento en 4 s». El siguiente lanzamiento restauró la cámara de primera persona y los controles mientras los rivales continuaban. Party normal volvió a tres vidas y dejó su selector deshabilitado.
+
+La primera captura reveló un codo por perspectiva en la salida del carrete; se corrigió y se añadió una regresión de ángulo proyectado. Después de publicar y recargar se comprobó visualmente la curva continua en vuelo libre y se probó otra soltada con boost. Capturas reales de la versión final: [carrete e hilo](tirante-1-14-carrete.jpg) y [selección de vidas](tirante-1-14-vidas.jpg).
+
+Render publicó los commits `fd70bc00f74b384cde454e8f8cda7696e9bc0dba` y `13a1152166c1dd1c2256d638d0c5b58fb1f7425e` en estado `live`. Diez archivos publicados coincidieron byte por byte con el repositorio. El endpoint de salud toma ahora la versión del paquete y confirmó 1.14.0.
+
+El navegador de revisión tiene WebGL deshabilitado y utiliza Canvas. No aparecieron errores de aplicación aparte de los avisos esperados por ese cambio. La geometría WebGL se comprueba por pruebas, pero no se realizó revisión visual en GPU, medición de FPS ni una partida online con dos humanos en esta revisión. Los dos clientes online están cubiertos por simulación y pruebas del servidor.
+
 ## Soltada, tirantes y carretes largos · 1.13.0 · 26 de octubre de 2026
 
 - `npm run build`: 66 módulos comprobados. `npm test`: batería completa aprobada y diez pruebas de integración del servidor, incluidas salas de 300 y 1000 yardas.
