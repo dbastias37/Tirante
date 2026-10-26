@@ -1,5 +1,21 @@
 # Validación de la exportación
 
+## Soltada, tirantes y carretes largos · 1.13.0 · 26 de octubre de 2026
+
+- `npm run build`: 66 módulos comprobados. `npm test`: batería completa aprobada y diez pruebas de integración del servidor, incluidas salas de 300 y 1000 yardas.
+- Se reprodujo la inestabilidad previa: 22 g, sin cola y ráfagas de 12 m/s superaban 420 m/s antes de un segundo. La integración nueva usa subpasos para el cuerpo, amortiguación aerodinámica estable y tensión radial implícita; conserva el paso de 240 Hz y el movimiento barrido completo de las colisiones.
+- `tests/payout-stability.mjs`: 72 combinaciones de masa, cola, viento y fase inicial, con soltada, recogida con boost y tirones. Velocidad máxima de la muestra: 15,24 m/s; estiramiento máximo: 2,91 m. Sin velocidades explosivas ni valores no finitos. Tres secuencias con el solucionador real de contactos y capacidades de 150 m, 300 yd y 1000 yd no desplazan el volantín más de 0,25 m por paso.
+- Se comprueban límite y estabilidad a capacidad completa, desgaste más allá de 150 m, guardado/restauración online y las tres listas de capacidad. Los 914,4 m caben dentro del terreno plano; se amplían horizonte, niebla y cámara sin aumentar los segmentos del hilo ni la malla del suelo.
+- Cuatro montajes asimétricos verifican que las puntas de los tres tirantes y el extremo del hilo comparten exactamente el mismo punto. También se comprueba durante la interpolación online con rotación. El ajuste visual de primera persona conserva ese extremo, los tramos cortados y todos los puntos físicos originales.
+- Se rechazan récords imposibles como el de la captura del fallo, sin perder los récords válidos ni las demás preferencias. Las pruebas de vuelo ligero, picada, recuperación, Party, cortes, cámaras y Rastro siguen aprobadas.
+- `npm run test:wind`: 1000 vuelos con viento fuerte; 113 seleccionados para ráfaga extraordinaria y 113 cortes (11,3 %), cero cortes en los otros vuelos y cero aterrizajes. Es una muestra determinista, no una tasa garantizada para cualquier maniobra.
+
+El commit `7ce02627e3268b1c31d71c81ba5ccc51de1dd006` llegó a `live` en Render. `/healthz` devolvió 1.13.0. Diez archivos publicados, incluidos física, hilo, escenas, configuración de capacidad, interpolación e interfaz, coincidieron byte por byte con el repositorio.
+
+En la web se eligió 1000 yd desde preparación y se lanzó el volantín. Una soltada sostenida elevó el contador de 8,0 a 11,8 m; después de recogida, soltada con boost y tirón llegó a 15,2 m, con valores finitos y una caída normal al tirar hacia abajo. Se relanzó y se verificó el carrete desde el borde inferior derecho. La cámara orbital a 2,7 m muestra el hilo llegando a la unión de los tres tirantes. Capturas reales: [primera persona](tirante-1-13-carrete.jpg) y [unión de tirantes](tirante-1-13-tirantes.jpg).
+
+El navegador de comprobación tiene WebGL deshabilitado y usa Canvas. No se observaron errores de la aplicación aparte del aviso esperado de ese cambio de renderer. La geometría WebGL y las proyecciones se verifican en las pruebas; no se realizó una revisión visual en GPU ni una medición de FPS.
+
 
 ## Inicio, carrete y unidades · 1.12.0 · 26 de octubre de 2026
 
