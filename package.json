@@ -1,6 +1,6 @@
 {
   "name": "tirante",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "private": true,
   "type": "module",
   "description": "TIRANTE: simulador 3D con vuelo libre, Party, contrarreloj y duelos online.",
@@ -11,7 +11,7 @@
     "start": "node --env-file-if-exists=.env server/index.mjs",
     "dev": "node --watch --env-file-if-exists=.env server/index.mjs",
     "build": "node scripts/verify.mjs",
-    "check": "node tests/physics.mjs && node tests/rope.mjs && node tests/rope-anchor.mjs && node tests/duel-camera.mjs && node tests/commission.mjs && node tests/party.mjs && node tests/party-options.mjs && node tests/online.mjs && node tests/rope-system.mjs && node tests/line-stress.mjs && node tests/battle-stability.mjs && node tests/render-performance.mjs && node tests/online-smoothing.mjs && node tests/trail-orbit.mjs && node tests/kite-customization.mjs && node tests/prints.mjs && node --test tests/server.test.mjs",
+    "check": "node tests/physics.mjs && node tests/rope.mjs && node tests/rope-anchor.mjs && node tests/duel-camera.mjs && node tests/commission.mjs && node tests/party.mjs && node tests/party-options.mjs && node tests/flight-equipment.mjs && node tests/online.mjs && node tests/rope-system.mjs && node tests/line-stress.mjs && node tests/battle-stability.mjs && node tests/render-performance.mjs && node tests/online-smoothing.mjs && node tests/trail-orbit.mjs && node tests/kite-customization.mjs && node tests/prints.mjs && node --test tests/server.test.mjs",
     "test": "npm run check",
     "test:wind": "node scripts/check-gust-rate.mjs"
   }

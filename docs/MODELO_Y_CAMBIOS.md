@@ -183,3 +183,16 @@ La IA decide cada 0,18 s (Hábil) o 0,10 s (Competitivo). Escoge el rival vivo m
 Party mantiene el estado `playing` cuando el jugador cae y quedan al menos dos pilotos. `spectating` desactiva sus controles; la cámara orbital sigue a un superviviente o la cámara general encuadra solo a los que siguen en juego. Cambiar el observado o la cámara no modifica la simulación. Los NPC siguen eligiendo rivales vivos. En Último en pie no hay desempate por reloj: la partida concluye con cero o un superviviente. La variante con tiempo conserva la comparación de integridad al acabar los 180/240 s, considerando solo participantes vivos.
 
 Una cuerda intacta cuyo dueño está en `grounded` se fractura antes de reunir contactos, con motivo `ground`. Conserva su estado de aterrizaje y los dos extremos visibles; no participa después en las barreras de colisión. La limpieza se aplica también al duelo de dos asientos, y los mensajes distinguen aterrizar de perder el hilo durante el vuelo.
+
+
+## 1.11.0 · Volantín suelto, cola y equipo
+
+La caída anterior aplicaba aceleración vertical constante y giro fijo. Ahora se integra una lámina ligera con gravedad, aire relativo, sustentación firmada y arrastre cuadrático semiimplícito. Se conserva la orientación de salida; una punta hacia abajo puede iniciar una picada antes de pasar a oscilación y planeo. Los parámetros de flutter son un modelo reducido de juego; no constituyen una reproducción experimental de una marca de papel. La masa corporal sigue siendo ajustable entre 22 y 70 g, más la cola; el vuelo sujeto conserva su calibración anterior.
+
+La cola usa 24 segmentos con restricciones de longitud, inercia en coordenadas del mundo, gravedad y arrastre. Se reinicia al cambiar de vuelo o teletransportarse, y se detiene en pausa. WebGL y Canvas comparten esa cadena. El cielo acompaña a la cámara y un suelo exterior sencillo permite seguir un volantín llevado más allá del claro.
+
+El catálogo usa formas de las siete fotografías aportadas: frente perforado con cinco u ocho huecos, tambor abierto, eje posterior de madera y bobinas cilíndricas de tapas coloreadas. Las etiquetas son composiciones geométricas sin nombres, letras ni logotipos. Cada modelo se combina en una sola malla para reducir llamadas de dibujo. Las opciones de rodamiento son buje, bolas abiertas y sellado.
+
+Las numeraciones de algodón Nº 24, Nº 10 y Nº 4 se contrastaron con el catálogo del proveedor [Modista](https://www.modista.cl/collections/hilo-para-volantin-1); la referencia aportada de poliéster Nº 10 identifica ese material en su etiqueta. No existe una equivalencia universal de número comercial a diámetro. Los diámetros 0,35 / 0,50 / 0,65 mm y 0,45 mm de poliéster son aproximaciones explícitas de la simulación; pesos, esfuerzo y resistencia son calibraciones jugables, no certificados de carga de los productos fotografiados. La mecánica conserva el límite de 150 m y el cálculo de cortes por tensión y roce.
+
+El planteamiento de oscilación y vuelco de una lámina se apoya conceptualmente en [On the Motion of Falling Leaves](https://arxiv.org/abs/1007.1769); los coeficientes y el acoplamiento con este juego se desarrollaron y probaron aquí.

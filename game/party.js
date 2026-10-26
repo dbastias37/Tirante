@@ -5,6 +5,7 @@ import {KitePhysics,DEFAULT_SETUP,clamp} from './physics.js';
 import {closestSegments,SawStroke} from './rope.js';
 import {appearance} from './appearance.js';
 import {controlNPC} from './npc-pilot.js';
+import {cleanEquipment} from './equipment.js';
 
 export const PARTY_NPCS=Object.freeze([
   {name:'Mateo',color:'teal',tint:'#397f80',x:6,z:0,phase:0,style:'Lee el cruce'},
@@ -23,18 +24,18 @@ export const escapeHTML=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;'
 export class PartyCommission extends Commission{
   constructor(player){
     super(player);this.pool=[this.rival,new KitePhysics(undefined,{seed:mixSeed(player.flightSeed^2)}),new KitePhysics(undefined,{seed:mixSeed(player.flightSeed^3)})];
-    this.partyMode=false;this.roster=[];this.contacts=[];this.events=[];this.eventId=0;this.npcCount=1;this.duration=90;
+    this.partyMode=false;this.roster=[];this.contacts=[];this.events=[];this.eventId=0;this.npcCount=1;this.duration=90;this.spectatorView='battle';
   }
   get rivals(){return this.partyMode?this.roster.slice(1).map(e=>e.pilot):[this.rival];}
   get aliveRivals(){return this.roster.slice(1).filter(e=>e.alive);}
   get focusEntry(){return this.roster.find(e=>e.pilot===this.rival);}
   get survivors(){return this.roster.filter(e=>e.alive);}
-  get spectating(){return this.partyMode&&this.active&&this.roster[0]?.alive===false;}
+  get spectating(){return this.partyMode&&this.visible&&this.roster[0]?.alive===false;}
   get watched(){return this.roster.find(e=>e.index===this.spectatorIndex&&e.alive)||null;}
   spectateNext(){const alive=this.survivors;this.spectatorIndex=(alive.find(e=>e.index>this.spectatorIndex)||alive[0])?.index??-1;return this.watched;}
   stop(){
     for(const p of this.pool||[]){p.reset();delete p.partyTint;}this.rival=this.pool?.[0]||this.rival;
-    this.partyMode=false;this.roster=[];this.contacts=[];this.events=[];super.stop();
+    this.partyMode=false;this.roster=[];this.contacts=[];this.events=[];this.spectatorView='battle';super.stop();
   }
   startParty(count=3,difficulty='normal',options={}){
     this.stop();this.winner=null;this.options=cleanPartyOptions(options);this.rules=this.options.rules;this.spectatorIndex=-1;
@@ -45,7 +46,7 @@ export class PartyCommission extends Commission{
     const entry=(pilot,name,tint,index)=>({pilot,name,tint,index,alive:true,reason:'',eliminatedAt:null,stroke:new SawStroke(),aiWait:0,footworkAt:0,hit:null,cutBy:null});
     this.roster=[entry(p,'Tú','#c96343',0)];this.playerStroke=this.roster[0].stroke;
     PARTY_NPCS.slice(0,this.npcCount).forEach((npc,i)=>{
-      const b=this.pool[i],side=Math.sign(npc.x),custom=this.options.npcs[i];b.configure({...DEFAULT_SETUP,...custom,knotsLeft:side>0?1:0,knotsRight:side<0?1:0});
+      const b=this.pool[i],side=Math.sign(npc.x),custom=this.options.npcs[i];b.configure({...DEFAULT_SETUP,...custom,...cleanEquipment(p.setup),knotsLeft:side>0?1:0,knotsRight:side<0?1:0});
       b.anchor.set(p.anchor.x+npc.x,1.35,p.anchor.z+npc.z);b.lineCapacity=p.lineCapacity;b.windSpeed=p.windSpeed;b.profile=p.profile;b.networkControlled=false;b.launch();b.time=p.time;b.spinSign=-side;b.partyTint=npc.tint;
       this.roster.push({...entry(b,custom.name,npc.tint,i+1),homeX:b.anchor.x,homeZ:b.anchor.z,side,phase:npc.phase,targetIndex:-1,thinkIn:0});
     });
@@ -56,7 +57,7 @@ export class PartyCommission extends Commission{
     if(!e.alive)return;e.alive=false;e.reason=reason;e.eliminatedAt=this.elapsed;e.pilot.sawing=false;e.pilot.setControls('hold',false);
     if(reason==='Hilo cortado')e.pilot.cutLine(e.hit?.edge,e.hit?.fraction);
     else if(e.pilot.rope.broken<0){e.pilot.rope.cutReason='ground';e.pilot.rope.breakAt(e.hit?.edge??14,e.hit?.fraction??.5);}
-    if(e.index===this.spectatorIndex||e.index===0)this.spectateNext();
+    if(e.index===this.spectatorIndex||e.index===0)this.spectateNext();if(e.index===0)this.spectatorView=reason==='Hilo cortado'?'kite':'battle';
     const cause=e.pilot.rope.cutReason,detail=cause==='wind'?' por una ráfaga extrema':cause==='tension'?' por exceso de tensión':'';
     const text=e.index===0?(reason==='Hilo cortado'?`Se cortó tu hilo${detail}.`:'Tu volantín tocó tierra.'):reason==='Hilo cortado'?`${e.name} perdió su hilo${detail|| (by?by==='Tú'?' en el cruce contigo':` en el cruce con ${by}`:'')}.`:`${e.name} tocó tierra.`;
     this.events.push({id:++this.eventId,time:this.elapsed,text});this.events=this.events.slice(-4);

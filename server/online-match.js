@@ -1,4 +1,5 @@
 import {appearance} from '../game/appearance.js';
+import {cleanEquipment} from '../game/equipment.js';
 import {mountSettings} from '../game/kite-shape.js';
 import {KitePhysics,DEFAULT_SETUP,clamp} from '../game/physics.js';
 import {Commission} from '../game/commission.js';
@@ -12,7 +13,7 @@ export function cleanSetup(value={}){
   for(const [k,a,b] of [['left',34,54],['right',34,54],['lower',42,62],['mass',22,70],['knotsLeft',0,5],['knotsRight',0,5],['knotsLower',0,5]])if(Number.isFinite(value[k]))s[k]=k.startsWith('knots')?Math.round(clamp(value[k],a,b)):clamp(value[k],a,b);
   if(typeof value.tail==='boolean')s.tail=value.tail;
   const mounts=mountSettings(value);s.anchorLeft=mounts.left;s.anchorRight=mounts.right;
-  Object.assign(s,appearance(value));
+  Object.assign(s,appearance(value),cleanEquipment(value));
   return s;
 }
 export function cleanInput(value={}){if(!value||typeof value!=='object')value={};return {action:['hold','release','reel'].includes(value.action)?value.action:'hold',boost:value.boost===true,saw:value.saw===true,x:clamp(Number(value.x)||0,-1,1),z:clamp(Number(value.z)||0,-1,1)};}

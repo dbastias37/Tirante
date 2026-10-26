@@ -10,7 +10,7 @@ export function extremeGust(p){
   const t=(p.flightTime-p.extremeGustAt)/2.4;if(t<=0||t>=1)return 1;
   return 1+1.55*Math.sin(Math.PI*t)**2;
 }
-export function remainingStrength(rope,edge,fraction=.5){return LINE_STRENGTH*Math.max(.12,1-.88*rope.wearAt(edge,fraction));}
+export function remainingStrength(rope,edge,fraction=.5){return (rope.owner.equipment?.thread.strength||LINE_STRENGTH)*Math.max(.12,1-.88*rope.wearAt(edge,fraction));}
 function expose(rope,load,strength,dt,limit=.03){
   rope.stressLoad=load;rope.strength=strength;rope.stressRatio=load/strength;
   // A frame spike is not a break. Excess load must persist; releasing unloads

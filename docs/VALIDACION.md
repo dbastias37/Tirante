@@ -1,5 +1,16 @@
 # Validación de la exportación
 
+## Planeo, cola y equipo · 1.11.0 · 26 de octubre de 2026
+
+- Pruebas de caída desde 20 m: viento de 0, 5,5, 9 y 12 m/s, orientación de salida y masas de 22, 34 y 70 g. La deriva aumenta con el viento; la picada inicial desciende más que la orientación horizontal; todos los estados permanecen finitos y terminan en tierra. Con el peso por defecto, las muestras de salida nivelada tardan aproximadamente 14–16 s en caer. Son escenarios deterministas, no una duración universal.
+- El integrador de caída converge entre 120 y 240 Hz y continúa idéntico después de guardar/restaurar el estado online. El corte sigue liberando el hilo; no se vuelve a introducir contacto con hebras eliminadas.
+- Se comprueban validación y persistencia del equipo, resistencia de cada hilo, desgaste comparado, velocidad y gasto del rodamiento, y equipamiento equivalente para los NPC.
+- La cola conserva inercia durante un giro, responde al viento, mantiene las longitudes acotadas y se congela al pausar. Los vértices y normales del papel y la cola son finitos.
+- Los diez modelos tienen una sola malla por objeto y menos de 12.000 triángulos. Un rayo atraviesa realmente las perforaciones del carrete; los huecos no son círculos pintados.
+- Las cámaras separan seguimiento del volantín cortado, vista desde la punta y batalla. Se puede seguir observando después del resultado y también cuando el último participante cae.
+
+Comprobación visual y publicación: pendiente de registrar.
+
 ## Party configurable y último en pie · 1.10.0 · 24 de octubre de 2026
 
 - `npm run build`: 50 módulos. `npm test`: suites completas y 9 pruebas HTTP/SQLite aprobadas.

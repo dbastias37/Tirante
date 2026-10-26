@@ -2,6 +2,9 @@ import {bowHeight,sailZ,bridleAnchors,bridleJunction,SPAR_OFFSET} from './kite-s
 import {appearance,paperColor} from './appearance.js';
 import {cachedSailArt,texturedTriangle} from './sail-art.js';
 import {OrbitCamera} from './orbit-camera.js';
+import {spectatorView,onboardFrame} from './spectator-camera.js';
+import {ArticulatedTail} from './tail.js';
+import {equipmentStats} from './equipment.js';
 import {drawCanvasTrail} from './trail-view.js';
 import {frameDuel,positionView} from './duel-camera.js';
 // Software perspective renderer for browsers without an available WebGL context.
@@ -15,7 +18,7 @@ export class CanvasLandscape {
   constructor(canvas,physics){
     this.canvas=canvas;this.physics=physics;this.ctx=canvas.getContext('2d',{alpha:false});if(!this.ctx)throw new Error('Canvas unavailable');
     this.camera=new PerspectiveCamera(50,1,.05,CAMERA_FAR);this.targetCamera=new PerspectiveCamera();this.camera.position.set(0,1.72,1.1);this.camera.lookAt(0,3.8,-24);
-    this.forward=v();this.follow=true;this.zoom=false;this.orbit=new OrbitCamera();this.yaw=0;this.pitch=.1;this.setup={...physics.setup};this.kitePosition=v();this.kiteRotation=new Quaternion();this.tmp=v();
+    this.forward=v();this.follow=true;this.zoom=false;this.orbit=new OrbitCamera();this.yaw=0;this.pitch=.1;this.setup={...physics.setup};this.kitePosition=v();this.kiteRotation=new Quaternion();this.tmp=v();this.tails=new WeakMap();
     const r=random(1955);
     this.trees=Array.from({length:18},(_,i)=>{const angle=i/18*Math.PI*2+(r()-.5)*.12,radius=210+r()*80;return {x:Math.sin(angle)*radius,z:Math.cos(angle)*radius,h:4+r()*5,phase:r()*6};});
     this.clouds=Array.from({length:10},()=>({x:(r()-.5)*180,y:30+r()*35,z:-80-r()*100,size:10+r()*15}));
@@ -23,7 +26,7 @@ export class CanvasLandscape {
   }
   resize(){this.width=innerWidth;this.height=innerHeight;this.ratio=renderPixelRatio(devicePixelRatio,this.inDuel);this.canvas.width=Math.round(this.width*this.ratio);this.canvas.height=Math.round(this.height*this.ratio);this.camera.aspect=this.width/this.height;this.camera.updateProjectionMatrix();}
   configure(s){this.setup={...s};}
-  drag(dx,dy){if(this.orbit.active||this.duel?.spectating&&this.duel.watched){this.orbit.drag(dx,dy);return;}if(this.follow){this.camera.getWorldDirection(this.forward);this.yaw=Math.atan2(this.forward.x,-this.forward.z);this.pitch=Math.asin(this.forward.y);}this.follow=false;this.yaw-=dx*.0035;this.pitch=clamp(this.pitch+dy*.003,-.35,1.4);}
+  drag(dx,dy){if(spectatorView(this.physics,this.duel).onboard)return;if(this.orbit.active||spectatorView(this.physics,this.duel).orbital){this.orbit.drag(dx,dy);return;}if(this.follow){this.camera.getWorldDirection(this.forward);this.yaw=Math.atan2(this.forward.x,-this.forward.z);this.pitch=Math.asin(this.forward.y);}this.follow=false;this.yaw-=dx*.0035;this.pitch=clamp(this.pitch+dy*.003,-.35,1.4);}
   project(point){const q=point.clone().project(this.camera);return {x:(q.x*.5+.5)*this.width,y:(.5-q.y*.5)*this.height,z:q.z};}
   local(x,y,z=0){return v(x,y,z).multiplyScalar(this.kiteScale).applyQuaternion(this.kiteRotation).add(this.kitePosition);}
   polygon(points,fill,stroke,width=1){const c=this.ctx;const ps=points.map(p=>this.project(p));if(ps.some(p=>p.z>1||!Number.isFinite(p.x+p.y)))return;c.beginPath();ps.forEach((p,i)=>i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y));c.closePath();if(fill){c.fillStyle=fill;c.fill();}if(stroke){c.strokeStyle=stroke;c.lineWidth=width;c.stroke();}}
@@ -72,7 +75,7 @@ export class CanvasLandscape {
     c.restore();
     if(facing)drawBridle();else drawSpars();
     this.line([...corners,corners[0]].map(p=>point(p)),'#8f7b5844',.7);
-    if(setup.tail){const tail=Array.from({length:30},(_,i)=>{const t=i/29;return this.local(Math.sin(time*3.3-t*7)*t*.08,-.4-t*1.1,-.01-Math.sin(t*4+time*1.8)*t*.1);});this.line(tail,color,1.9);for(let i=4;i<29;i+=6){const t=i/29,x=Math.sin(time*3.3-t*7)*t*.08,y=-.4-t*1.1,z=-.01-Math.sin(t*4+time*1.8)*t*.1;this.polygon([this.local(x-.04,y+.025,z),this.local(x+.04,y-.025,z),this.local(x+.04,y+.025,z),this.local(x-.04,y-.025,z)],color);}}
+    if(setup.tail){let tail=this.tails.get(p);if(!tail){tail=new ArticulatedTail();this.tails.set(p,tail);}const points=tail.update(time,this.kitePosition,this.kiteRotation,p.wind,p.velocity,this.kiteScale);this.line(tail.points,color,1.9);for(let i=4;i<=20;i+=4){const q=points[i],twist=Math.sin(time*4-i*.6),x=Math.cos(twist)*.047,z=Math.sin(twist)*.047;this.polygon([this.local(q.x,q.y,q.z),this.local(q.x-x,q.y+.023,q.z-z),this.local(q.x-x,q.y-.023,q.z-z)],color);this.polygon([this.local(q.x,q.y,q.z),this.local(q.x+x,q.y+.023,q.z+z),this.local(q.x+x,q.y-.023,q.z+z)],color);}}
     return junction;
   }
   drawRival(time){
@@ -95,7 +98,7 @@ export class CanvasLandscape {
     for(let i=0;i<points.length-1;i++){
       if(i===r.broken)continue;const a=points[i],b=points[i+1];if(a.z>1||b.z>1)continue;
       const worn=r.broken<0?r.wearAt(i):0,contact=r.contactAge<.1&&Math.abs(i-r.contactEdge)<2;
-      c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.strokeStyle='#3c514b70';c.lineWidth=2.7;c.stroke();c.strokeStyle=worn>.25?'#df9a5e':contact?'#ffe4a0':color;c.lineWidth=contact?1.8:1.2;c.stroke();
+      const thickness=(p.equipment?.thread.diameter||.5)/.5;c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.strokeStyle='#3c514b70';c.lineWidth=1.5+1.2*thickness;c.stroke();c.strokeStyle=worn>.25?'#df9a5e':contact?'#ffe4a0':color;c.lineWidth=(contact?1.8:1.2)*thickness;c.stroke();
       if(worn>.2){const x=(a.x+b.x)*.5,y=(a.y+b.y)*.5;c.beginPath();c.moveTo(x-3,y+4);c.lineTo(x,y);c.lineTo(x+4,y+3);c.lineWidth=.8;c.stroke();}
     }
     if(r.broken>=0)for(const id of [r.broken,r.broken+1]){const q=points[id];if(q.z>1)continue;c.fillStyle=color;c.beginPath();c.arc(q.x,q.y,2.4,0,Math.PI*2);c.fill();}
@@ -112,22 +115,22 @@ export class CanvasLandscape {
     const thread=c.createLinearGradient(0,-52,0,28);thread.addColorStop(0,'#e3d5ac');thread.addColorStop(.4,'#c9bb92');thread.addColorStop(1,'#a1926c');c.fillStyle=thread;c.beginPath();c.roundRect(-32,-48,68,73,9);c.fill();
     const threadShift=this.physics.action==='hold'?0:time*(this.physics.boost?30:12)*(this.physics.action==='reel'?1:-1);
     c.strokeStyle='#aa9b7370';c.lineWidth=1;for(let i=0;i<18;i++){const tx=-29+((i*3.6+threadShift)%64+64)%64;c.beginPath();c.moveTo(tx,-45);c.quadraticCurveTo(tx+7,-9,tx,22);c.stroke();}
-    c.fillStyle='#a4774c';c.beginPath();c.ellipse(37,-12,22,47,-.05,0,Math.PI*2);c.fill();c.strokeStyle='#ba8a59';c.lineWidth=3;c.stroke();
+    const equipment=equipmentStats(this.setup);c.fillStyle=equipment.reel.color;c.beginPath();c.ellipse(37,-12,22,47,-.05,0,Math.PI*2);c.fill();c.strokeStyle=equipment.reel.rim;c.lineWidth=2.5;c.stroke();for(let i=0;i<equipment.reel.holes;i++){const angle=i/equipment.reel.holes*Math.PI*2+threadShift*.02;c.fillStyle='#63513a';c.beginPath();c.ellipse(37+Math.cos(angle)*13,-12+Math.sin(angle)*29,equipment.reel.holes===8?3.5:4.4,equipment.reel.holes===8?6:8,-.05,0,Math.PI*2);c.fill();}
     c.fillStyle='#735538';c.beginPath();c.ellipse(37,-12,6,12,-.05,0,Math.PI*2);c.fill();
     c.fillStyle='#d4a584';c.strokeStyle='#b78a6c';c.lineWidth=.8;for(let i=0;i<4;i++){c.beginPath();c.roundRect(36+i*5,8+i*8,24,11,6);c.fill();c.stroke();}
     c.fillStyle='#d8aa87';c.beginPath();c.ellipse(28,-24,11,21,-.9,0,Math.PI*2);c.fill();c.restore();
     return {x:x-5*scale,y:y-43*scale};
   }
   render(dt,mode,paused){
-    const p=this.physics,intro=mode==='intro',time=p.time,inDuel=!intro&&!!this.duel?.visible;const spectating=!!this.duel?.spectating,watched=spectating?this.duel.watched?.pilot:null;const orbital=!intro&&(this.orbit.active||!!watched);if(!orbital)positionView(this.camera,inDuel,dt,this.duel?.partyMode?this.duel.npcCount:1);const orbitFrame=orbital?this.orbit.frame(this.camera,watched?.position||p.position,dt):null,duelFrame=inDuel&&!orbital?frameDuel(this.camera,this.duel):null;this.tugOffset=Math.sin(clamp((time-p.lastTug)/.2,0,1)*Math.PI)*12;
+    const p=this.physics,intro=mode==='intro',time=p.time,inDuel=!intro&&!!this.duel?.visible;const view=spectatorView(p,this.duel),spectating=view.active,watched=view.pilot,onboard=!intro&&view.onboard;const orbital=!intro&&!onboard&&(this.orbit.active||view.orbital);if(!orbital&&!onboard)positionView(this.camera,inDuel,dt,this.duel?.partyMode?this.duel.npcCount:1);const orbitFrame=onboard?onboardFrame(this.camera,p,dt):orbital?this.orbit.frame(this.camera,watched?.position||p.position,dt):null,duelFrame=inDuel&&!orbital&&!onboard?frameDuel(this.camera,this.duel):null;this.tugOffset=Math.sin(clamp((time-p.lastTug)/.2,0,1)*Math.PI)*12;
     if(intro){this.kitePosition.set((this.width<760?1.7:4.3)+Math.sin(time*.47)*.25,p.profile==='calm'?.5:(this.width<760?7.4:6.1)+Math.sin(time*.7)*.2,-14);this.kiteRotation.setFromEuler(new Euler(-.38,.1,Math.sin(time*.66)*.08-.13));this.kiteScale=1.45;}
     else{this.kitePosition.copy(p.position);this.kiteRotation.copy(p.orientation);this.kiteScale=1;if(p.state==='ready'||p.state==='grounded')this.kiteRotation.setFromEuler(new Euler(-.3,0,.17));}
-    if(intro)this.tmp.set(0,3.8,-24);else if(orbital)this.tmp.copy(orbitFrame.target);else if(this.follow){if(duelFrame)this.tmp.copy(duelFrame.target);else{this.tmp.copy(p.position);this.tmp.y+=p.state==='flying'?-.7:.8;}}else this.tmp.set(Math.sin(this.yaw)*Math.cos(this.pitch),Math.sin(this.pitch),-Math.cos(this.yaw)*Math.cos(this.pitch)).add(this.camera.position);
-    this.targetCamera.position.copy(this.camera.position);this.targetCamera.lookAt(this.tmp);if(orbital)this.camera.quaternion.copy(this.targetCamera.quaternion);else this.camera.quaternion.slerp(this.targetCamera.quaternion,1-Math.exp(-dt*(intro?2:3.5)));
+    if(intro)this.tmp.set(0,3.8,-24);else if(orbitFrame)this.tmp.copy(orbitFrame.target);else if(this.follow){if(duelFrame)this.tmp.copy(duelFrame.target);else{this.tmp.copy(p.position);this.tmp.y+=p.state==='flying'?-.7:.8;}}else this.tmp.set(Math.sin(this.yaw)*Math.cos(this.pitch),Math.sin(this.pitch),-Math.cos(this.yaw)*Math.cos(this.pitch)).add(this.camera.position);
+    this.targetCamera.position.copy(this.camera.position);this.targetCamera.lookAt(this.tmp);if(orbital||onboard)this.camera.quaternion.copy(this.targetCamera.quaternion);else this.camera.quaternion.slerp(this.targetCamera.quaternion,1-Math.exp(-dt*(intro?2:3.5)));
     this.camera.fov=mix(this.camera.fov,intro?50:orbitFrame?orbitFrame.fov:duelFrame?(this.follow?duelFrame.fov:74):this.zoom?35:this.width<760?63:54,1-Math.exp(-dt*6));this.camera.updateProjectionMatrix();this.camera.updateMatrixWorld();
     if(this.inDuel!==inDuel){this.inDuel=inDuel;this.resize();}
     const c=this.ctx;c.setTransform(this.ratio,0,0,this.ratio,0,0);this.drawSky(time);if(!intro){drawCanvasTrail(this,this.trail,time);this.drawRival(time);}
-    const junction=this.drawKite(time,intro),end=this.project(junction);let start={x:this.width*.5,y:this.height*1.06};if(!intro)start={x:(this.width<760?this.width*.87:this.width*.84)-5*(this.width<760?.7:1),y:this.height*(this.width<760?.68:.85)-43*(this.width<760?.7:1)+this.tugOffset};
+    const junction=onboard?this.local(0,0,0):this.drawKite(time,intro),end=this.project(junction);let start={x:this.width*.5,y:this.height*1.06};if(!intro)start={x:(this.width<760?this.width*.87:this.width*.84)-5*(this.width<760?.7:1),y:this.height*(this.width<760?.68:.85)-43*(this.width<760?.7:1)+this.tugOffset};
     if(!intro){
       const depth=.57,baseFov=this.width<760?63:54,tan=Math.tan(baseFov*Math.PI/360);
       start=this.project(p.rope.points[0]);this.reelStart=start;
@@ -135,7 +138,7 @@ export class CanvasLandscape {
       this.reelScale=Math.max(.3,Math.min(1.1,depth/Math.max(.2,-viewDepth)*tan/Math.tan(this.camera.fov*Math.PI/360)));
     }
     if(intro&&end.z<1){c.beginPath();c.moveTo(start.x,start.y);c.quadraticCurveTo((start.x+end.x)*.5,(start.y+end.y)*.5+20,end.x,end.y);c.strokeStyle='#f4ebcb';c.lineWidth=1;c.stroke();}
-    else if(!intro)this.drawTether(p,'#f9edc9');
+    else if(!intro&&!onboard)this.drawTether(p,'#f9edc9');
     if(!intro&&!orbital&&!spectating)this.drawReel(time);
     const projected=q=>{const o=this.project(q);return {...o,behind:o.z>1,visible:o.z<1&&o.x>15&&o.x<this.width-15&&o.y>25&&o.y<this.height-15};};
     const point=this.project(this.kitePosition),nose=this.project(this.local(0,.4,0));return {trail:this.trail?.active&&this.trail.target?projected(this.trail.target):null,rivals:this.duel?.visible?(this.duel.rivals||[this.duel.rival]).map(b=>projected(b.position)):[],rival:this.duel?.visible?projected(this.duel.rival.position):null,clash:this.duel?.contact?projected(this.duel.contactPoint):null,x:point.x,y:point.y,visible:point.z<1&&point.x>20&&point.x<this.width-20&&point.y>20&&point.y<this.height-20,angle:Math.atan2(nose.x-point.x,point.y-nose.y)*180/Math.PI,size:Math.abs(nose.y-point.y)*2};

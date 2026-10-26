@@ -152,3 +152,11 @@ El ZIP contiene el código y los recursos necesarios para desplegar. Las salas a
 El acceso privado de Sites tampoco se traslada: este servidor no incluye cuentas ni una pantalla de acceso. Al publicarlo como Web Service, la dirección de Render será accesible por internet. La versión anterior permanece independiente.
 
 La descripción del modelo físico y el historial están en [docs/MODELO_Y_CAMBIOS.md](docs/MODELO_Y_CAMBIOS.md). Es un modelo jugable reducido, no una medición de fidelidad física del 99,5 %.
+
+
+### Novedades 1.11.0
+
+- Caída libre con viento aparente, planeo, balanceo y picada según la orientación; cola articulada con inercia.
+- Cámaras «Mi volantín», «A bordo» y «Ver todos» después de perder el hilo. El resultado deja continuar observando.
+- Taller → Hilo, carrete y rodamiento: catálogo tridimensional giratorio, arrastre 360°, flechas laterales para cambiar de pieza y arriba/abajo para cambiar de categoría; estadísticas bajo cada selección.
+- Cuatro hilos, tres carretes de madera y tres mecanismos de giro. El equipo modifica arrastre, peso del hilo, resistencia, desgaste, velocidad y esfuerzo. Los NPC reciben el mismo equipo que el jugador; online conserva el equipo individual validado por el servidor.

@@ -24,7 +24,7 @@ export class Tether {
     this.previous=this.points.map(q=>q.clone());this.velocities=this.points.map(V);this.weights=this.points.map((_,i)=>i===0||i===n?0:1);
     this.rest=Array(n).fill(p.lineLength/n);this.lambda=Array(n).fill(0);this.wear=new Float64Array(1201);this.broken=-1;this.breakPoint=null;
     this.contactLoad=0;this.contactEdge=-1;this.feedDelta=0;this.lastLength=p.lineLength;this.integrity=100;this.contactAge=100;this.breakAge=100;
-    this.stressLoad=0;this.strength=LINE_STRENGTH;this.stressRatio=0;this.overload=0;this.jamStrain=0;this.jamTime=0;this.shock=0;this.cutReason='';
+    this.stressLoad=0;this.strength=p.equipment?.thread.strength||LINE_STRENGTH;this.stressRatio=0;this.overload=0;this.jamStrain=0;this.jamTime=0;this.shock=0;this.cutReason='';
   }
   moveAnchor(position){
     // The simulated hand and the visible reel share one endpoint. Move only the
@@ -72,7 +72,7 @@ export class Tether {
     if(work<=0||this.broken>=0)return false;
     const coordinate=this.materialAt(edge,fraction)/.125,index=Math.round(coordinate);
     for(let k=Math.max(0,index-1);k<=Math.min(1200,index+1);k++){
-      const amount=work/3.6*Math.max(0,1-Math.abs(k-coordinate)/1.25);
+      const amount=work/(3.6*(this.owner.equipment?.thread.wear||1))*Math.max(0,1-Math.abs(k-coordinate)/1.25);
       this.wear[k]=Math.min(1,this.wear[k]+amount);this.integrity=Math.min(this.integrity,100*(1-this.wear[k]));
     }
     return this.integrity<=.001;

@@ -22,7 +22,7 @@ assert.equal(d.spectateNext().index,2);d.eliminate(d.roster[2],'En tierra');asse
 for(const e of d.survivors){e.pilot.position.y=8;d.controlNPC(e,.2);assert.ok(d.roster[e.targetIndex].alive);assert.notEqual(e.targetIndex,0);assert.notEqual(e.targetIndex,e.index);}
 d.remaining=0;d.elapsed=600;d.checkOutcome();assert.equal(d.state,'playing','Last man standing cannot end by timeout or score');
 d.spectatorIndex=-1;const camera=new PerspectiveCamera(54,16/9,.05,1200);camera.position.set(0,2,4);p.position.set(1000,0,1000);const frame=frameDuel(camera,d);assert.ok(frame.target.length()<30,'Spectator overview excludes the eliminated player');
-d.eliminate(d.roster[1],'Hilo cortado');d.checkOutcome();assert.equal(d.result.winner,'Sur');assert.equal(d.result.outcome,'loss');assert.equal(d.state,'finished');assert.equal(d.spectating,false);
+d.eliminate(d.roster[1],'Hilo cortado');d.checkOutcome();assert.equal(d.result.winner,'Sur');assert.equal(d.result.outcome,'loss');assert.equal(d.state,'finished');assert.equal(d.spectating,true,'The end of the round still permits watching the falling kite');
 d.startParty(2,'normal',custom);assert.equal(d.result,null);assert.equal(d.spectatorIndex,-1);assert.equal(d.roster[1].name,'Luna <azul>');assert.ok(d.roster.every(e=>e.pilot.rope.broken===-1));
 
 // The AI protects overload, manages energy, and attacks only a live opponent.

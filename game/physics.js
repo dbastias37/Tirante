@@ -1,9 +1,11 @@
 import {mountSettings} from './kite-shape.js';
 import {Tether} from './rope.js';
 import {flightGust,extremeGust,updateWindStress} from './line-stress.js';
+import {DEFAULT_EQUIPMENT,cleanEquipment,equipmentStats} from './equipment.js';
+import {stepFreeFlight} from './free-flight.js';
 import { Vector3, Quaternion, Matrix4 } from './vendor/three.module.js';
 
-export const DEFAULT_SETUP = Object.freeze({left:44, right:44, lower:52, knotsLeft:0, knotsRight:0, knotsLower:0, mass:34, tail:true, color:'terracotta', anchorLeft:55, anchorRight:55, sailStyle:'classic', paperColor:null, printId:'', imageFit:'cover', imageScale:1});
+export const DEFAULT_SETUP = Object.freeze({...DEFAULT_EQUIPMENT,left:44, right:44, lower:52, knotsLeft:0, knotsRight:0, knotsLower:0, mass:34, tail:true, color:'terracotta', anchorLeft:55, anchorRight:55, sailStyle:'classic', paperColor:null, printId:'', imageFit:'cover', imageScale:1});
 export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export const mix=(a,b,t)=>a+(b-a)*t;
 export const LINE_BOOST=2.5;
@@ -25,7 +27,7 @@ export function configuration(s=DEFAULT_SETUP) {
 // Coefficients are tunable estimates, not measurements of a particular kite.
 export class KitePhysics {
   constructor(setup={...DEFAULT_SETUP},{seed=0x51f15e}={}) {
-    this.setup={...setup}; this.trim=configuration(this.setup);
+    this.setup={...DEFAULT_SETUP,...setup,...cleanEquipment(setup)}; this.trim=configuration(this.setup);this.equipment=equipmentStats(this.setup);
     this.anchor=new Vector3(0,1.35,0); this.position=new Vector3();this.velocity=new Vector3();
     this.orientation=new Quaternion(); this.normal=new Vector3(0,.75,.66);this.nose=new Vector3(0,.66,-.75);
     this.right=new Vector3(1,0,0);this.wind=new Vector3();this.aero=new Vector3();this.force=new Vector3();
@@ -37,10 +39,11 @@ export class KitePhysics {
     this._rel=new Vector3();this._flow=new Vector3();this._up=new Vector3();this._side=new Vector3();this._lift=new Vector3();
     this._radial=new Vector3();this._basis=new Matrix4();this.reset();this.rope=new Tether(this);
   }
-  configure(s) {this.setup={...s};this.trim=configuration(s);}
+  configure(s) {this.setup={...DEFAULT_SETUP,...s,...cleanEquipment(s)};this.trim=configuration(this.setup);this.equipment=equipmentStats(this.setup);}
   reset() {
     this.state='ready';this.position.set(this.anchor.x,.48,this.anchor.z-7.8);this.velocity.set(0,0,0);this.lineLength=8;
     this.heading=0;this.spin=0;this.tension=0;this.bend=0;this.flightTime=0;this.steadyTime=0;
+    this.freeTime=0;this.freePhase=0;this.freeYaw=0;this.freeNoseY=0;this.freeMode='';
     this.action='hold';this.boost=false;this.boostRequested=false;this.energy=100;this.exhausted=false;this.tugCooldown=0;this.pendingTug=0;this.lastTug=-100;
     this.tugCount=0;this.tugSequence=1;this.tugIndex=0;this.maneuverHold=0;this.turns=0;this.turnProgress=0;
     this.sawing=false;this.sawClock=0;this.spinSign=this.trim.bias<-.04?-1:1;this.updateAttitude(new Vector3(0,0,-1));this.rope?.reset();
@@ -89,10 +92,10 @@ export class KitePhysics {
     this.right.crossVectors(this.nose,this.normal).normalize();
     this.orientation.setFromRotationMatrix(this._basis.makeBasis(this.right,this.nose,this.normal));
   }
-  cutLine(edge=this.rope.contactEdge,fraction=.5,reason='abrasion'){if(this.rope.broken<0){this.rope.cutReason=reason;this.rope.breakAt(clamp(Number.isFinite(edge)&&edge>=0?edge:18,0,this.rope.points.length-2),fraction);}this.sawing=false;this.state='cut';this.tension=0;this.pendingTug=0;this.setControls('hold',false);}
+  cutLine(edge=this.rope.contactEdge,fraction=.5,reason='abrasion'){if(this.rope.broken<0){this.rope.cutReason=reason;this.rope.breakAt(clamp(Number.isFinite(edge)&&edge>=0?edge:18,0,this.rope.points.length-2),fraction);}if(this.state!=='cut'){this.freeTime=0;this.freePhase=this.heading;this.freeNoseY=this.nose.y;this.freeYaw=Math.atan2(this.nose.x,-this.nose.z);this.freeMode='glide';}this.sawing=false;this.state='cut';this.tension=0;this.pendingTug=0;this.setControls('hold',false);}
   step(dt) {
     this.time+=dt;this.tugCooldown=Math.max(0,this.tugCooldown-dt);this.maneuverHold=Math.max(0,this.maneuverHold-dt);this.windAt(this.position,this.wind);
-    if(this.state==='cut'){this.velocity.x+=(this.wind.x*.35-this.velocity.x)*dt;this.velocity.z+=(this.wind.z*.35-this.velocity.z)*dt;this.velocity.y-=2.4*dt;this.position.addScaledVector(this.velocity,dt);this.heading+=dt*2;this.updateAttitude(this._flow.copy(this.wind).normalize());if(this.position.y<.42){this.position.y=.42;this.state='grounded';}this.rope.step(dt);return;}
+    if(this.state==='cut'){stepFreeFlight(this,dt);this.rope.step(dt);return;}
     if(this.state!=='flying'){this.energy=Math.min(100,this.energy+10*dt);this._flow.copy(this.wind);if(this._flow.lengthSq()<.001)this._flow.set(0,0,-1);else this._flow.normalize();this.updateAttitude(this._flow);this.rope.step(dt);return;}
     // Schedule the second distinct pulse on simulation time: it freezes on
     // pause and is cleared on restart or landing, without wall-clock timers.
@@ -103,9 +106,9 @@ export class KitePhysics {
     this.boost=this.boostRequested&&!this.exhausted&&this.energy>0;
     const exerting=this.action==='reel'&&this.lineLength>3||this.action==='release'&&this.lineLength<this.lineCapacity;
     const cost=exerting?(this.boost?(this.action==='reel'?22:14):(this.action==='reel'?2.3+Math.min(this.tension,20)*.08:-1)): -6;
-    this.energy=clamp(this.energy-cost*dt,0,100);
+    this.energy=clamp(this.energy-cost*(cost>0?this.equipment.effort:1)*dt,0,100);
     const drag=1/(1+this.rope.contactLoad*.12);
-    const lineSpeed=drag*(this.boost?LINE_BOOST:1)*(this.energy<20?.55+.45*this.energy/20:1);
+    const lineSpeed=drag*this.equipment.speed*(this.boost?LINE_BOOST:1)*(this.energy<20?.55+.45*this.energy/20:1);
     const releasing=this.action==='release'&&this.lineLength<this.lineCapacity;
     const reeling=this.action==='reel'&&this.lineLength>3;
     if(releasing)this.lineLength=Math.min(this.lineCapacity,this.lineLength+1.8*lineSpeed*dt);
@@ -138,9 +141,9 @@ export class KitePhysics {
     this.aero.copy(this._lift).multiplyScalar(q*area*cl).addScaledVector(flow,q*area*cd);
     // Half of the distributed tether load is lumped at the kite; the remainder
     // is carried by the hand. The segmented chain supplies contact deflection.
-    this.aero.addScaledVector(flow,.25*1.225*1.1*.0005*this.lineLength*speed*speed);
-    const effectiveMass=this.trim.mass+this.lineLength*.00012/3;
-    this.force.copy(this.aero);this.force.y-=(this.trim.mass+this.lineLength*.00012*.5)*9.81;
+    this.aero.addScaledVector(flow,.25*1.225*1.1*this.equipment.thread.diameter/1000*this.lineLength*speed*speed);
+    const lineMass=this.equipment.thread.mass/1000,effectiveMass=this.trim.mass+this.lineLength*lineMass/3;
+    this.force.copy(this.aero);this.force.y-=(this.trim.mass+this.lineLength*lineMass*.5)*9.81;
     const radial=this._radial.copy(this.position).sub(this.anchor);
     const distance=radial.length();radial.normalize();
     const route=this.rope.loadPath(this.position,radial);
