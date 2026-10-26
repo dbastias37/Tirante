@@ -9,7 +9,15 @@
 - Los diez modelos tienen una sola malla por objeto y menos de 12.000 triángulos. Un rayo atraviesa realmente las perforaciones del carrete; los huecos no son círculos pintados.
 - Las cámaras separan seguimiento del volantín cortado, vista desde la punta y batalla. Se puede seguir observando después del resultado y también cuando el último participante cae.
 
-Comprobación visual y publicación: pendiente de registrar.
+`npm run build`: 59 módulos. `npm test`: suites completas y 9 pruebas HTTP/SQLite aprobadas. El rasterizador alternativo comprueba profundidad por píxel: la oclusión no depende del orden de las caras y el espacio vacío sigue siendo transparente. En una medición local de 60 vistas del carrete, a 630 × 340 píxeles, el dibujo tarda 10,7 ms de media; esta medida de CPU no equivale a FPS en una GPU o teléfono.
+
+En Render se verificaron las flechas ↑/↓ para categoría y ←/→ para pieza; el cambio de grosor a 0,35 mm actualiza resistencia y desgaste; el carrete de 8 pulgadas y el rodamiento sellado se conservan tras recargar, con velocidad combinada 1,17× y esfuerzo 99 %. Se comprobó el giro automático, su pausa y el arrastre manual hasta el reverso abierto con eje de madera.
+
+En una ronda real con tres NPC, tras aterrizar el jugador, el reloj continuó de 00:11 a 00:24 con rivales activos. «A bordo» activó la cámara de la punta; «Mi volantín» volvió a la órbita; «Ver todos» recuperó la batalla. La ronda terminó a los 25 s y «Resultado» → «Seguir mirando» conservó la escena terminada. Las caídas en el aire se validan además con los escenarios físicos deterministas anteriores.
+
+El navegador de pruebas tiene WebGL deshabilitado: la revisión visual usa Canvas, incluyendo el visor 3D de equipo con prueba de profundidad. No se ha medido rendimiento en una GPU real. Los módulos publicados se comparan byte por byte con el repositorio y `/healthz` confirma 1.11.0.
+
+![Carrusel de equipo con carrete de madera, categorías y estadísticas](tirante-1-11-equipo.jpg)
 
 ## Party configurable y último en pie · 1.10.0 · 24 de octubre de 2026
 
