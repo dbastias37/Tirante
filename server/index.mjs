@@ -5,6 +5,7 @@ import {resolve,extname,sep} from 'node:path';
 import {SQLiteRooms,DiskPrints} from './storage.mjs';
 import {handleRoom,RoomError,digest} from './rooms.js';
 import {putPrint,validatePrint,MAX_PRINT_BYTES} from './prints.js';
+import metadata from '../package.json' with {type:'json'};
 
 const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const GAME=resolve(ROOT,'game');
@@ -39,7 +40,7 @@ export function createApplication({dataDir=resolve(ROOT,'data'),trustProxy=false
     res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');res.setHeader('X-Frame-Options','SAMEORIGIN');
     try{
       const url=new URL(req.url,'http://localhost'),path=url.pathname,method=req.method;
-      if(path==='/healthz'&&(method==='GET'||method==='HEAD')){rooms.health();json(res,200,{ok:true,version:'1.13.0',storage:'sqlite+files'});return;}
+      if(path==='/healthz'&&(method==='GET'||method==='HEAD')){rooms.health();json(res,200,{ok:true,version:metadata.version,storage:'sqlite+files'});return;}
       if(path==='/api/pvp'){
         if(method!=='POST')throw new HttpError(405,'Usa POST.');sameOrigin(req);
         if(req.headers['content-type']?.split(';')[0]!=='application/json')throw new HttpError(415,'Se requiere JSON.');

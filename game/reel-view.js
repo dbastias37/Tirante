@@ -22,12 +22,22 @@ export function foregroundLine(rope,camera,width,height,outlet,cache=[]){
   if(limit<1)return cache;
   // Join in front of the camera. Blending toward the physical anchor behind
   // the eye made the thread dip offscreen and return in a hook at the reel.
-  let join=1;const above=1-2*Math.min(height*.74,outlet.y-24)/height;
+  let join=Math.min(limit,8);const above=1-2*Math.min(height*.53,outlet.y-24)/height;
   for(;join<limit;join++){const q=rope.points[join].clone().project(camera);if(q.z<1&&q.z>-1&&q.y>above&&rope.points[join].distanceTo(camera.position)>2)break;}
-  const end=rope.points[join],direction=end.clone().sub(origin),length=direction.length();
-  const tangent=join<limit?rope.points[join+1].clone().sub(end).normalize():direction.clone().normalize();
-  // Bounded Bézier handles cannot make a loop or displace the kite junction.
-  const c1=origin.clone().addScaledVector(direction,.34),c2=end.clone().addScaledVector(tangent,-Math.min(length*.18,.3));
-  for(let i=0;i<join;i++){const t=i/join,u=1-t;cache[i].copy(origin).multiplyScalar(u*u*u).addScaledVector(c1,3*u*u*t).addScaledVector(c2,3*u*t*t).addScaledVector(end,t*t*t);}
+  const start=origin.clone().project(camera),end=rope.points[join].clone().project(camera);
+  if(end.z<=-1||end.z>=1)return cache;
+  // Construct the foreground arc in screen space. A world-space handle close
+  // to the eye collapses under perspective and leaves a sharp elbow at the join.
+  const sx=(start.x*.5+.5)*width,sy=(.5-start.y*.5)*height,ex=(end.x*.5+.5)*width,ey=(.5-end.y*.5)*height;
+  const dx=ex-sx,dy=ey-sy,length=Math.hypot(dx,dy);
+  const next=rope.points[Math.min(join+1,limit)].clone().project(camera);
+  let tx=(next.x-end.x)*width,ty=-(next.y-end.y)*height,n=Math.hypot(tx,ty);
+  if(n<1e-6){tx=dx;ty=dy;n=length||1;}
+  const handle=Math.min(length*.38,Math.max(0,sy-ey)*.72);
+  const c1x=sx+dx*.34,c1y=sy+dy*.34,c2x=ex-tx/n*handle,c2y=ey-ty/n*handle;
+  for(let i=0;i<join;i++){
+    const t=i/join,u=1-t,x=sx*u*u*u+3*c1x*u*u*t+3*c2x*u*t*t+ex*t*t*t,y=sy*u*u*u+3*c1y*u*u*t+3*c2y*u*t*t+ey*t*t*t;
+    cache[i].set(x/width*2-1,1-y/height*2,start.z+(end.z-start.z)*t).unproject(camera);
+  }
   return cache;
 }
