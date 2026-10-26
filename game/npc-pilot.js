@@ -48,14 +48,14 @@ export function controlNPC(party,e,dt){
     const delta=nearest.a.clone().sub(nearest.b);delta.y=0;
     if(delta.length()>.04){delta.setLength(Math.min(delta.length(),.65*interval));
       const next=b.anchor.clone().add(delta);next.x=clamp(next.x,e.homeX-3,e.homeX+3);next.z=clamp(next.z,e.homeZ-12,e.homeZ+12);
-      const clear=point=>party.roster.every(other=>other===e||point.distanceTo(other.pilot.anchor)>=18);
+      const clear=point=>party.roster.every(other=>other===e||point.distanceTo(other.pilot.anchor)>=13);
       if(!clear(next))next.x=b.anchor.x;
       if(clear(next)){b.anchor.copy(next);b.energy=Math.max(0,b.energy-delta.length()*.8);}
     }
   }
   // Aim the cord through an airborne point on the target's real line, then
   // carry the sail past it. Matching the rival's reel length is insufficient
-  // when the pilots stand 24 m apart.
+  // when the pilots stand 18 m apart.
   const crossing=p.rope.points[Math.floor((p.rope.points.length-1)*.78)];
   const reach=crossing.clone().sub(b.anchor),needed=Math.min(b.lineCapacity-.8,Math.max(lineFloor,reach.length()*1.36));
   const desired=clamp(Math.atan2(reach.x,Math.max(5,reach.y))*.82,-1.1,1.1);

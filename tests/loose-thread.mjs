@@ -23,10 +23,14 @@ for(const [w,h]of[[1920,1080],[977,928],[390,844]])for(const altitude of [3,10,3
  const start=project(points[0]);assert.ok(Math.hypot(start.x-outlet.x,start.y-outlet.y)<1e-6);assert.ok(raw.every((q,i)=>q.equals(p.rope.points[i])));assert.ok(points.at(-1).equals(raw.at(-1)));
  let join=1;while(join<points.length-1&&!points[join].equals(raw[join]))join++;let priorY=outlet.y;
  for(let i=0;i<=join;i++){const q=project(points[i]);assert.ok(q.z>-1&&q.z<1,'Foreground stays in front of the eye');assert.ok(q.y<=priorY+1e-7,'No hook or backward exit toward the bottom of the screen');priorY=q.y;}
- for(let i=1;i<=join;i++){
+ for(let i=1;i<join;i++){
   const a=project(points[i-1]),b=project(points[i]),c=project(points[i+1]);
   const incoming=new Vector3(b.x-a.x,b.y-a.y,0),outgoing=new Vector3(c.x-b.x,c.y-b.y,0);
   assert.ok(incoming.angleTo(outgoing)<18*Math.PI/180,'Perspective must not leave an elbow at the foreground join');
  }
+ // A taut reference line must stay straight, rather than receive a decorative arc.
+ for(let i=0;i<p.rope.points.length;i++)p.rope.points[i].copy(raw[0]).lerp(raw.at(-1),i/(raw.length-1));
+ const taut=foregroundLine(p.rope,camera,w,h,outlet),a=project(taut[0]),b=project(taut.at(-1));
+ for(const point of taut){const q=project(point);assert.ok(Math.abs((q.x-a.x)*(b.y-a.y)-(q.y-a.y)*(b.x-a.x))/Math.hypot(b.x-a.x,b.y-a.y)<1e-5,'Taut thread has no imposed bow');}
 }
 console.log('PASS: loose links do not resist compression, bounded joint count, exact independent cut tips, gravity/ground support and a monotonic reel outlet at desktop/mobile sizes.');

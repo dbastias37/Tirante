@@ -7,10 +7,11 @@ import {ArticulatedTail,TAIL_VERTICES} from './tail.js';
 import {equipmentStats} from './equipment.js';
 import {createReelModel,disposeModel} from './equipment-models.js';
 import {TrailView,drawCanvasTrail} from './trail-view.js';
-import {frameDuel,positionView} from './duel-camera.js';
+import {frameDuel,positionView,pilotFocusTarget} from './duel-camera.js';
 import {reelViewport,foregroundLine} from './reel-view.js';
 import {ROPE_DRAW_SEGMENTS} from './rope.js';
 import {displayStrands,LOOSE_SUBDIVISIONS} from './rope-view.js';
+import {PilotModel} from './pilot-model.js';
 import * as THREE from './vendor/three.module.js';
 import {clamp,mix,configuration} from './physics.js';
 import {PAPER_OPACITY,FIELD_SIZE,CAMERA_NEAR,CAMERA_FAR,SKY_RADIUS,HORIZON_RADIUS,FOG_NEAR,FOG_FAR,renderPixelRatio,terrainHeight} from './render-settings.js';
@@ -96,12 +97,12 @@ export class Landscape {
     this.createSky();this.createLandscape();this.createReel();this.trailView=new TrailView(this.scene);
     this.kite=new PaperKite();this.kite.configure(physics.setup);this.scene.add(this.kite.group);
     this.rope=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(Array.from({length:ROPE_DRAW_SEGMENTS*LOOSE_SUBDIVISIONS*2},()=>v3())),new THREE.LineBasicMaterial({color:0xf8efc8,transparent:true,opacity:.9}));this.rope.frustumCulled=false;this.scene.add(this.rope);
-    this.rivalVisuals=Array.from({length:3},()=>this.createRival());
+    this.rivalVisuals=Array.from({length:3},(_,i)=>this.createRival(i));
     const first=this.rivalVisuals[0];this.rivalKite=first.kite;this.rivalRope=first.rope;this.rivalPilot=first.pilot;
     for(const rope of [this.rope,...this.rivalVisuals.map(v=>v.rope)]){
       rope.geometry.setAttribute('color',new THREE.BufferAttribute(new Float32Array(ROPE_DRAW_SEGMENTS*LOOSE_SUBDIVISIONS*2*3).fill(1),3));rope.material.vertexColors=true;rope.material.color.setHex(0xffffff);
       rope.userData.fray=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(Array.from({length:120},()=>v3())),new THREE.LineBasicMaterial({color:0xedd29d}));rope.userData.fray.frustumCulled=false;this.scene.add(rope.userData.fray);
-      rope.userData.tips=new THREE.Points(new THREE.BufferGeometry().setFromPoints([v3(),v3()]),new THREE.PointsMaterial({color:0xfbe6b2,size:3,sizeAttenuation:false}));rope.userData.tips.frustumCulled=false;rope.userData.tips.visible=false;this.scene.add(rope.userData.tips);
+      rope.userData.tips=new THREE.Points(new THREE.BufferGeometry().setFromPoints([v3(),v3()]),new THREE.PointsMaterial({color:0xfbe6b2,size:1.5,sizeAttenuation:false}));rope.userData.tips.frustumCulled=false;rope.userData.tips.visible=false;this.scene.add(rope.userData.tips);
       const wideGeometry=new THREE.BufferGeometry();for(const attr of ['position','color'])wideGeometry.setAttribute(attr,new THREE.Float32BufferAttribute(new Float32Array(ROPE_DRAW_SEGMENTS*LOOSE_SUBDIVISIONS*6*3),3));rope.userData.ribbon=new THREE.Mesh(wideGeometry,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));rope.userData.ribbon.frustumCulled=false;rope.userData.ribbon.visible=false;this.scene.add(rope.userData.ribbon);rope.material.visible=false;
     }
     this.clashGlow=mesh(new THREE.SphereGeometry(.07,8,6),0xffcf73);this.clashGlow.material=new THREE.MeshBasicMaterial({color:0xffd780});this.clashGlow.visible=false;this.scene.add(this.clashGlow);
@@ -109,14 +110,13 @@ export class Landscape {
     this.screenPoint=v3();this.nosePoint=v3();this.worldEnd=v3();this.worldStart=v3();this.forward=v3();this._temp=v3();
     this.resize();this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(document.body);
   }
-  createRival(){
+  createRival(index=0){
     const kite=new PaperKite();kite.configure({...this.physics.setup,color:'teal'});kite.group.visible=false;this.scene.add(kite.group);
     const rope=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(Array.from({length:ROPE_DRAW_SEGMENTS*LOOSE_SUBDIVISIONS*2},()=>v3())),new THREE.LineBasicMaterial({color:0xffffff}));rope.frustumCulled=false;rope.visible=false;this.scene.add(rope);
-    const pilot=new THREE.Group(),torso=mesh(new THREE.CylinderGeometry(.2,.17,.65,7),0x397f80);torso.position.y=1.02;pilot.add(torso);const head=mesh(new THREE.SphereGeometry(.14,12,9),0xc69876);head.position.y=1.53;pilot.add(head);
-    for(const x of [-.12,.12]){const leg=mesh(new THREE.CylinderGeometry(.07,.06,.74,6),0x465e55);leg.position.set(x,.37,0);pilot.add(leg);const arm=mesh(new THREE.CapsuleGeometry(.055,.35,3,6),0xc69876);arm.position.set(x*1.9,1.16,-.12);arm.rotation.x=-.7;arm.rotation.z=-x;pilot.add(arm);}pilot.visible=false;this.scene.add(pilot);
-    return {kite,rope,pilot,torso};
+    const actor=new PilotModel(index),pilot=actor.group;pilot.visible=false;this.scene.add(pilot);
+    return {kite,rope,pilot,actor};
   }
-  configureRivals(rivals){rivals.forEach((p,i)=>{const visual=this.rivalVisuals[i];if(visual){visual.kite.configure(p.setup);visual.torso.material.color.set(p.partyTint||'#397f80');}});}
+  configureRivals(rivals){rivals.forEach((p,i)=>{const visual=this.rivalVisuals[i];if(visual){visual.kite.configure(p.setup);visual.actor.configure(p.partyTint||'#397f80');}});}
   createSky(){
     const skyGeo=new THREE.SphereGeometry(SKY_RADIUS,24,16);
     const skyMat=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,uniforms:{top:{value:new THREE.Color(0x7bafc8)},bottom:{value:new THREE.Color(0xe6e6cd)}},vertexShader:'varying vec3 vPos; void main(){vPos=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'uniform vec3 top;uniform vec3 bottom;varying vec3 vPos;void main(){float h=clamp(normalize(vPos).y*1.7,0.0,1.0);gl_FragColor=vec4(mix(bottom,top,pow(h,.6)),1.0);}',fog:false});
@@ -189,11 +189,11 @@ export class Landscape {
       if(wear>.2&&fi<116){this._temp.copy(r.points[i]).lerp(r.points[i+1],.5);const q=this._temp,size=.025+wear*.035;fray.setXYZ(fi++,q.x-size,q.y+size,q.z);fray.setXYZ(fi++,q.x,q.y,q.z);fray.setXYZ(fi++,q.x,q.y,q.z);fray.setXYZ(fi++,q.x+size,q.y+size*.6,q.z+.02);}
     }
     attr.needsUpdate=true;colors.needsUpdate=true;line.geometry.setDrawRange(0,index);fray.needsUpdate=true;line.userData.fray.geometry.setDrawRange(0,fi);line.userData.fray.visible=line.visible;
-    const ribbon=line.userData.ribbon;if(ribbon){const vertices=ribbon.geometry.attributes.position,shades=ribbon.geometry.attributes.color,a=v3(),b=v3(),side=v3(),middle=v3(),normal=v3();let k=0;const thickness=(p.equipment?.thread.diameter||.5)/.5;for(let i=0;i<index;i+=2){a.fromBufferAttribute(attr,i);b.fromBufferAttribute(attr,i+1);middle.copy(a).add(b).multiplyScalar(.5);normal.subVectors(middle,this.camera.position);side.subVectors(b,a).cross(normal).normalize();if(side.lengthSq()<.1)side.set(1,0,0);const width=Math.max(.0002,normal.length()*Math.tan(this.camera.fov*Math.PI/360)*1.2*thickness/this.height);side.multiplyScalar(width);for(const [point,sign]of[[a,-1],[a,1],[b,1],[a,-1],[b,1],[b,-1]]){vertices.setXYZ(k,point.x+side.x*sign,point.y+side.y*sign,point.z+side.z*sign);shades.setXYZ(k++,colors.getX(i),colors.getY(i),colors.getZ(i));}}vertices.needsUpdate=true;shades.needsUpdate=true;ribbon.geometry.setDrawRange(0,k);ribbon.visible=line.visible;}
+    const ribbon=line.userData.ribbon;if(ribbon){const vertices=ribbon.geometry.attributes.position,shades=ribbon.geometry.attributes.color,a=v3(),b=v3(),side=v3(),middle=v3(),normal=v3();let k=0;const thickness=(p.equipment?.thread.diameter||.5)/.5;for(let i=0;i<index;i+=2){a.fromBufferAttribute(attr,i);b.fromBufferAttribute(attr,i+1);middle.copy(a).add(b).multiplyScalar(.5);normal.subVectors(middle,this.camera.position);side.subVectors(b,a).cross(normal).normalize();if(side.lengthSq()<.1)side.set(1,0,0);const width=Math.max(.0002,normal.length()*Math.tan(this.camera.fov*Math.PI/360)*.85*thickness/this.height);side.multiplyScalar(width);for(const [point,sign]of[[a,-1],[a,1],[b,1],[a,-1],[b,1],[b,-1]]){vertices.setXYZ(k,point.x+side.x*sign,point.y+side.y*sign,point.z+side.z*sign);shades.setXYZ(k++,colors.getX(i),colors.getY(i),colors.getZ(i));}}vertices.needsUpdate=true;shades.needsUpdate=true;ribbon.geometry.setDrawRange(0,k);ribbon.visible=line.visible;}
     line.userData.tips.visible=r.broken>=0&&line.visible;if(r.broken>=0){const tips=line.userData.tips.geometry.attributes.position;for(let k=0;k<2;k++){const q=r.points[r.broken+k];tips.setXYZ(k,q.x,q.y,q.z);}tips.needsUpdate=true;}
   }
   render(dt,mode,paused){
-    const p=this.physics,intro=mode==='intro',inDuel=!intro&&!!this.duel?.visible;const view=spectatorView(p,this.duel),spectating=view.active,watched=view.pilot,onboard=!intro&&view.onboard;const orbital=!intro&&!onboard&&(this.orbit.active||view.orbital);if(!orbital&&!onboard)positionView(this.camera,inDuel,dt,this.duel?.partyMode?this.duel.npcCount:1);const orbitFrame=onboard?onboardFrame(this.camera,p,dt):orbital?this.orbit.frame(this.camera,watched?.position||p.position,dt):null,duelFrame=inDuel&&!orbital&&!onboard?frameDuel(this.camera,this.duel):null;this.time=p.time;
+    const p=this.physics,intro=mode==='intro',inDuel=!intro&&!!this.duel?.visible;const focus=pilotFocusTarget(this.duel,this.pilotFocus),view=spectatorView(p,this.duel),spectating=view.active,watched=view.pilot,onboard=!focus&&!intro&&view.onboard;const orbital=!intro&&!onboard&&(this.orbit.active||view.orbital);if(!orbital&&!onboard)positionView(this.camera,inDuel,dt,this.duel?.partyMode?this.duel.npcCount:1);const orbitFrame=onboard?onboardFrame(this.camera,p,dt):orbital?this.orbit.frame(this.camera,focus||watched?.position||p.position,dt):null,duelFrame=inDuel&&!orbital&&!onboard?frameDuel(this.camera,this.duel):null;this.time=p.time;
     if(this.inDuel!==inDuel){this.inDuel=inDuel;this.renderer.setPixelRatio(renderPixelRatio(window.devicePixelRatio,inDuel));}
     for(const cloud of this.clouds)cloud.position.x=cloud.userData.baseX+Math.sin(p.time*.008)*9;
     if(intro){this.kite.group.position.set((this.width<760?1.7:4.3)+Math.sin(p.time*.47)*.25,p.profile==='calm'?.5:(this.width<760?7.4:6.1)+Math.sin(p.time*.7)*.2,-14);this.kite.group.rotation.set(-.38,.1,Math.sin(p.time*.66)*.08-.13);this.kite.group.scale.setScalar(1.45);}
@@ -217,7 +217,7 @@ export class Landscape {
     this.rope.visible=!onboard;this.rope.material.visible=intro;this.rope.userData.ribbon.visible=!intro&&!onboard;
     const rivalVisible=!intro&&!!this.duel?.visible,rivals=this.duel?.rivals||[this.duel?.rival];this.clashGlow.visible=rivalVisible&&this.duel.contact;
     this.rivalVisuals.forEach((visual,i)=>{const b=rivals[i],visible=rivalVisible&&!!b;visual.kite.group.visible=visible;visual.pilot.visible=visible;visual.rope.visible=visible;visual.rope.userData.fray.visible=visible;visual.rope.userData.ribbon.visible=visible;visual.rope.userData.tips.visible=visible&&b.rope.broken>=0;
-      if(visible){visual.kite.group.position.copy(b.position);visual.kite.group.quaternion.copy(b.orientation);visual.kite.animate(p.time,b.bend,b.wind.length(),b);visual.pilot.position.set(b.anchor.x,0,b.anchor.z);this.updateTether(visual.rope,b);}
+      if(visible){visual.kite.group.position.copy(b.position);visual.kite.group.quaternion.copy(b.orientation);visual.kite.animate(p.time,b.bend,b.wind.length(),b);visual.actor.update(b,p.time);this.updateTether(visual.rope,b);}
     });if(this.clashGlow.visible)this.clashGlow.position.copy(this.duel.contactPoint);
     this.trailView.update(!intro?this.trail:null,this.camera,p.time);
     this.sky.position.copy(this.camera.position);this.renderer.render(this.scene,this.camera);if(!intro&&!orbital&&!spectating)this.renderReel();

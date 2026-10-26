@@ -62,7 +62,7 @@ function updateControlState(){
   $('control-dock').classList.toggle('boosting',boost&&physics.action!=='hold');
   $('tug-label').textContent=requested?'Tirón ×2':'Tirón';
 }
-function setMode(next){mode=next;compactUI?.setFlight(next==='flight');releaseAll();$('intro').classList.toggle('hidden',next!=='intro');if(next==='flight')flow?.hide();else if(flow?.state==='hidden')flow.show('menu');$('flight-ui').classList.toggle('hidden',next!=='flight');document.querySelector('.topbar').classList.toggle('flight-mode',next==='flight');if(next==='flight'){landscape.follow=true;updateFollow();}updateUI();}
+function setMode(next){mode=next;landscape.pilotFocus=-1;compactUI?.setFlight(next==='flight');releaseAll();$('intro').classList.toggle('hidden',next!=='intro');if(next==='flight')flow?.hide();else if(flow?.state==='hidden')flow.show('menu');$('flight-ui').classList.toggle('hidden',next!=='flight');document.querySelector('.topbar').classList.toggle('flight-mode',next==='flight');if(next==='flight'){landscape.follow=true;updateFollow();}updateUI();}
 function openModal(id){compactUI?.setCameraTools(false);if(id==='trail-modal'&&online?.active){online.open();return;}if(id==='trail-modal')updateTrailMenu();if(trail.visible&&['workshop','wind-modal','equipment-modal'].includes(id)){toast('Termina el recorrido para cambiar el volantín o el viento.');return;}if(online?.active&&id==='commission-modal')id='online-modal';if(online?.active&&['workshop','wind-modal','equipment-modal'].includes(id)){toast('Sal de la sala para cambiar tus ajustes.');return;}if(duel.active&&['workshop','wind-modal','equipment-modal'].includes(id)){toast('Termina la comisión para cambiar el volantín o el viento.');return;}releaseAll();if(id==='commission-modal')updateCommissionMenu();previousFocus=document.activeElement;if(id==='workshop'){setupChanged=false;updateWorkshop();}modal=id;all('#overlay>.modal').forEach(el=>el.classList.toggle('hidden',el.id!==id));$('overlay').classList.remove('hidden');$(id).scrollTop=0;if(id==='equipment-modal')equipmentUI.paint();if(id==='wind-modal')updateWindSettings();if(id==='pause-modal')$('resume-button').innerHTML=mode==='intro'?'Volver al inicio <span>↗</span>':'Continuar <span>↗</span>';requestAnimationFrame(()=>$(id).querySelector('button')?.focus({preventScroll:true}));}
 function closeModal(){const old=modal;modal=null;if(old==='online-settings-modal'&&onlineSettingsReturn){onlineSettingsReturn=false;openModal('online-modal');flow?.refresh();return;}$('overlay').classList.add('hidden');if(['workshop','equipment-modal'].includes(old)&&setupChanged){physics.reset();setupChanged=false;if(mode==='flight')toast('Ajustes guardados. Prueba un nuevo lanzamiento.');}previousFocus?.focus?.({preventScroll:true});flow?.refresh();updateUI();}
 function goFlying(){if(online?.active){leaveCommission();return;}stopTrail();duel.stop();closeModal();physics.reset();landscape.orbit.active=false;setMode('flight');toast(compactUI?.query.matches?'Mantén Soltar o Recoger. Activa Boost para acelerar.':'Q / E: soltar y recoger · Shift: boost · Shift + Espacio: doble tirón.');}
@@ -80,7 +80,7 @@ function chooseGameMode(choice){
 function preparationSnapshot(choice){
   const fixed=choice==='trail',party=['party','last-man'].includes(choice),net=choice==='online';
   const profile=fixed?'breeze':party?partyUI.value.profile:net?$('online-wind').value:physics.profile;
-  return {setup:fixed?{...DEFAULT_SETUP,...appearance(setup)}:setup,fixed,capacity:fixed?65:net?Number($('online-capacity').value):physics.lineCapacity,wind:fixed?5.5:party?partyUI.value.wind:net?Number($('online-strength').value):physics.profile==='calm'?0:physics.windSpeed,weather:{breeze:'Brisa constante',gusts:'Entre ráfagas',strong:'Viento firme',calm:'En calma'}[profile],opponents:party?`${partyUI.value.lives} vidas · ${partyCount} rivales · ${partyUI.value.npcs.slice(0,partyCount).map(n=>n.name).join(', ')} · ${$('npc-level').value==='hard'?'Competitivo':'Hábil'}`:net?'Rival humano · 3 vidas · puestos a 26,2 yd (24 m)':fixed?'8 destellos · 90 segundos · equipo equilibrado':'Un vuelo sin rivales ni límite de tiempo',audio:!!audio?.enabled,assists};
+  return {setup:fixed?{...DEFAULT_SETUP,...appearance(setup)}:setup,fixed,capacity:fixed?65:net?Number($('online-capacity').value):physics.lineCapacity,wind:fixed?5.5:party?partyUI.value.wind:net?Number($('online-strength').value):physics.profile==='calm'?0:physics.windSpeed,weather:{breeze:'Brisa constante',gusts:'Entre ráfagas',strong:'Viento firme',calm:'En calma'}[profile],opponents:party?`${partyUI.value.lives} vidas · ${partyCount} rivales · ${partyUI.value.npcs.slice(0,partyCount).map(n=>n.name).join(', ')} · ${$('npc-level').value==='hard'?'Competitivo':'Hábil'}`:net?'Rival humano · 3 vidas · puestos a 19,7 yd (18 m)':fixed?'8 destellos · 90 segundos · equipo equilibrado':'Un vuelo sin rivales ni límite de tiempo',audio:!!audio?.enabled,assists};
 }
 function editPreparation(kind,choice){
   if(kind==='help'){openModal('help-modal');return;}
@@ -103,11 +103,21 @@ function startTrail(){
 function showTrailResult(){
   const r=trail.result;if(!r)return;trailResultShown=true;$('trail-medal').textContent=r.won?`MEDALLA DE ${r.medal.toUpperCase()}`:'RASTRO DE LUZ';$('trail-result-title').textContent=r.won?'El recorrido es tuyo.':'Queda cielo por descubrir.';$('trail-result-time').textContent=formatTime(r.seconds,true);$('trail-result-captures').textContent=`${r.collected} DE ${r.total} DESTELLOS`;$('trail-result-reason').textContent=r.reason;$('trail-new-best').textContent=trailNewBest?'Nueva mejor vuelta en este navegador.':trailBest?`Tu mejor vuelta: ${formatTime(trailBest,true)}`:'Prueba soltadas cortas y espera la respuesta del volantín.';openModal('trail-result-modal');
 }
+function viewPilot(){
+  if(!duel.visible)return;
+  const rivals=duel.rivals||[duel.rival];landscape.pilotFocus=(Number.isInteger(landscape.pilotFocus)?landscape.pilotFocus:-1)+1;
+  if(landscape.pilotFocus>=rivals.length){landscape.pilotFocus=-1;landscape.orbit.active=false;}
+  else{landscape.orbit.active=true;landscape.orbit.reset();landscape.orbit.distance=3.3;landscape.orbit.pitch=.09;const p=rivals[landscape.pilotFocus];landscape.orbit.yaw=Math.atan2(p.position.x-p.anchor.x,p.position.z-p.anchor.z)+.5;}
+  landscape.follow=true;updateFollow();
+}
 function updateCamera(){
+  const pilot=landscape.pilotFocus>=0&&duel.visible,name=duel.roster?.[landscape.pilotFocus+1]?.name||'Rival';
+  $('pilot-view').classList.toggle('hidden',!duel.visible);$('pilot-view').setAttribute('aria-pressed',!!pilot);$('pilot-view').textContent=pilot?`${name} · siguiente →`:'Ver jugadores · P';
+
   const orbit=!spectator().onboard&&(landscape.orbit.active||spectator().orbital);document.body.classList.toggle('orbiting',orbit&&mode==='flight');$('camera-button').innerHTML=`Cámara: ${spectator().onboard?'a bordo':orbit?'orbital':'1ª persona'} <kbd>V</kbd>`;$('camera-button').setAttribute('aria-pressed',orbit);$('orbit-zoom').classList.toggle('hidden',!orbit);$('orbit-distance').innerHTML=distanceHTML(landscape.orbit.distance);
 }
-function toggleCamera(){if(spectator().active){duel.spectatorView=spectator().mode==='kite'?'onboard':spectator().mode==='onboard'?'battle':'kite';landscape.orbit.active=false;landscape.follow=true;updateFollow();return;}landscape.orbit.active=!landscape.orbit.active;landscape.follow=true;updateFollow();}
-function centerCamera(){if(spectator().onboard)return;if(landscape.orbit.active||spectator().orbital)landscape.orbit.reset();else{landscape.follow=!landscape.follow;if(!landscape.follow){landscape.camera.getWorldDirection(landscape.forward);landscape.yaw=Math.atan2(landscape.forward.x,-landscape.forward.z);landscape.pitch=Math.asin(landscape.forward.y);}}updateFollow();}
+function toggleCamera(){if(landscape.pilotFocus>=0){landscape.pilotFocus=-1;landscape.orbit.active=false;landscape.follow=true;updateFollow();return;}if(spectator().active){duel.spectatorView=spectator().mode==='kite'?'onboard':spectator().mode==='onboard'?'battle':'kite';landscape.orbit.active=false;landscape.follow=true;updateFollow();return;}landscape.orbit.active=!landscape.orbit.active;landscape.follow=true;updateFollow();}
+function centerCamera(){if(landscape.pilotFocus>=0){landscape.pilotFocus=-1;landscape.orbit.active=false;landscape.follow=true;updateFollow();return;}if(spectator().onboard)return;if(landscape.orbit.active||spectator().orbital)landscape.orbit.reset();else{landscape.follow=!landscape.follow;if(!landscape.follow){landscape.camera.getWorldDirection(landscape.forward);landscape.yaw=Math.atan2(landscape.forward.x,-landscape.forward.z);landscape.pitch=Math.asin(landscape.forward.y);}}updateFollow();}
 
 const counted=(n,one,many)=>`${n} ${n===1?one:many}`;
 function updatePartyRoster(){
@@ -247,12 +257,12 @@ function bindEvents(){
   for(const id of ['flight-trail','pause-trail','trail-options'])$(id).addEventListener('click',()=>trail.visible?openModal('trail-modal'):beginPreparation('trail'));
   $('trail-start').addEventListener('click',()=>beginPreparation('trail'));$('trail-retry').addEventListener('click',startTrail);
   for(const id of ['trail-leave','trail-free'])$(id).addEventListener('click',()=>showFront('menu'));
-  $('trail-resume').addEventListener('click',closeModal);$('camera-button').addEventListener('click',toggleCamera);
+  $('trail-resume').addEventListener('click',closeModal);$('camera-button').addEventListener('click',toggleCamera);$('pilot-view').addEventListener('click',viewPilot);
   $('orbit-near').addEventListener('click',()=>{landscape.orbit.zoom(-100);updateCamera();});$('orbit-far').addEventListener('click',()=>{landscape.orbit.zoom(100);updateCamera();});
-  $('spectator-next').addEventListener('click',()=>{duel.spectatorView='battle';duel.spectateNext();landscape.follow=true;landscape.orbit.reset();updateUI();});
-  $('spectator-all').addEventListener('click',()=>{duel.spectatorView='battle';duel.spectatorIndex=-1;landscape.orbit.active=false;landscape.follow=true;updateUI();});
+  $('spectator-next').addEventListener('click',()=>{landscape.pilotFocus=-1;duel.spectatorView='battle';duel.spectateNext();landscape.follow=true;landscape.orbit.reset();updateUI();});
+  $('spectator-all').addEventListener('click',()=>{landscape.pilotFocus=-1;duel.spectatorView='battle';duel.spectatorIndex=-1;landscape.orbit.active=false;landscape.follow=true;updateUI();});
   $('spectator-exit').addEventListener('click',()=>showFront('menu'));
-  for(const [id,view]of[['spectator-kite','kite'],['spectator-onboard','onboard']])$(id).addEventListener('click',()=>{duel.spectatorView=view;landscape.orbit.active=false;landscape.follow=true;landscape.orbit.reset();updateFollow();updateUI();});
+  for(const [id,view]of[['spectator-kite','kite'],['spectator-onboard','onboard']])$(id).addEventListener('click',()=>{landscape.pilotFocus=-1;duel.spectatorView=view;landscape.orbit.active=false;landscape.follow=true;landscape.orbit.reset();updateFollow();updateUI();});
   $('result-watch').addEventListener('click',()=>{resultShown=true;closeModal();});$('spectator-result').addEventListener('click',()=>{if(online?.active){if(resultShown)openModal('result-modal');}else showCommissionResult();});
   for(const id of ['workshop-equipment','pause-equipment'])$(id).addEventListener('click',()=>openModal('equipment-modal'));$('equipment-done').addEventListener('click',closeModal);
   $('party-count').addEventListener('change',e=>{partyCount=clamp(Number(e.target.value),1,3);save();updatePartyRoster();});
@@ -297,6 +307,7 @@ function bindEvents(){
     else if(key==='n'){if(duel.visible)openModal('commission-modal');else beginPreparation('party');}
     else if(key==='g'){if(trail.visible)openModal('trail-modal');else beginPreparation('trail');}
     else if(key==='v')toggleCamera();
+    else if(key==='p')viewPilot();
     else if(key==='r'){if(trail.visible){openModal('trail-modal');return;}if(duel.visible){openModal('commission-modal');return;}releaseAll();physics.reset();landscape.follow=true;updateFollow();toast('De vuelta en tierra. Todo listo para otro intento.');}
     else if(key==='c'){$('follow-button').click();}
   });
@@ -314,7 +325,7 @@ function frame(now){
   const dt=lastTime?Math.min((now-lastTime)/1000,.08):1/60;lastTime=now;
   if(online?.active)online.render(physics,duel);
   if(mode==='intro'&&!modal){physics.time+=dt;physics.windAt(physics.position,physics.wind);}
-  if(mode==='flight'&&!online?.active&&!modal&&!document.hidden){accumulator+=dt;const step=1/240;while(accumulator>=step){const wasSpectating=spectator().active;physics.step(step);duel.step(step);if(wasSpectating!==spectator().active){releaseAll();landscape.follow=true;landscape.orbit.active=false;landscape.orbit.reset();}if(!duel.visible)solveRopeSystem([physics.rope],step);trail.step(step);accumulator-=step;}}
+  if(mode==='flight'&&!online?.active&&!modal&&!document.hidden){accumulator+=dt;const step=1/240;while(accumulator>=step){const wasSpectating=spectator().active;physics.step(step);duel.step(step);if(wasSpectating!==spectator().active){landscape.pilotFocus=-1;releaseAll();landscape.follow=true;landscape.orbit.active=false;landscape.orbit.reset();}if(!duel.visible)solveRopeSystem([physics.rope],step);trail.step(step);accumulator-=step;}}
   if(mode==='flight'&&!online?.active&&duel.state==='finished'&&!duelRecorded){recordCommission();releaseAll();resultAt=physics.time;}
   if(!online?.active&&duel.state==='finished'&&!resultShown&&!modal&&!spectator().active&&physics.time-resultAt>2.5)showCommissionResult();
   if(trail.state==='finished'&&!trailFinishedAt){trailFinishedAt=physics.time;releaseAll();if(trail.result.won&&(!trailBest||trail.elapsed<trailBest)){trailBest=trail.elapsed;trailNewBest=true;save();}}
@@ -327,7 +338,7 @@ function frame(now){
   const show=mode==='flight'&&physics.state==='flying'&&assists&&marker.visible;
   $('kite-marker').classList.toggle('hidden',!show);
   if(show){$('kite-marker').style.left=marker.x+'px';$('kite-marker').style.top=(marker.y-Math.max(30,marker.size*.6+15))+'px';$('direction-arrow').style.transform=`rotate(${marker.angle}deg)`;}
-  $('offscreen-hint').classList.toggle('hidden',mode!=='flight'||physics.state!=='flying'||marker.visible||!!modal);
+  $('offscreen-hint').classList.toggle('hidden',mode!=='flight'||physics.state!=='flying'||marker.visible||landscape.pilotFocus>=0||!!modal);
   for(const [id,point,enabled] of [['rival-marker',marker.rival,duel.visible&&!duel.partyMode],['clash-marker',marker.clash,duel.contact]]){const show=mode==='flight'&&enabled&&point?.visible;$(id).classList.toggle('hidden',!show);if(show){$(id).style.left=point.x+'px';$(id).style.top=(point.y-(id==='rival-marker'?35:-22))+'px';}}
   const tagSlots=[];
   for(let i=0;i<3;i++){

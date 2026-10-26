@@ -6,9 +6,11 @@ import {spectatorView,onboardFrame} from './spectator-camera.js';
 import {ArticulatedTail} from './tail.js';
 import {reelViewport,canvasReelOutlet,foregroundLine} from './reel-view.js';
 import {displayStrands} from './rope-view.js';
+import {PilotModel} from './pilot-model.js';
+import {PilotCanvas} from './pilot-canvas.js';
 import {equipmentStats} from './equipment.js';
 import {drawCanvasTrail} from './trail-view.js';
-import {frameDuel,positionView} from './duel-camera.js';
+import {frameDuel,positionView,pilotFocusTarget} from './duel-camera.js';
 // Software perspective renderer for browsers without an available WebGL context.
 // The physical state and camera remain three-dimensional in both renderers.
 import {Vector3,PerspectiveCamera,Quaternion,Euler} from './vendor/three.module.js';
@@ -20,7 +22,7 @@ export class CanvasLandscape {
   constructor(canvas,physics){
     this.canvas=canvas;this.physics=physics;this.ctx=canvas.getContext('2d',{alpha:false});if(!this.ctx)throw new Error('Canvas unavailable');
     this.camera=new PerspectiveCamera(50,1,CAMERA_NEAR,CAMERA_FAR);this.targetCamera=new PerspectiveCamera();this.camera.position.set(0,1.72,1.1);this.camera.lookAt(0,3.8,-24);
-    this.forward=v();this.follow=true;this.zoom=false;this.orbit=new OrbitCamera();this.yaw=0;this.pitch=.1;this.setup={...physics.setup};this.kitePosition=v();this.kiteRotation=new Quaternion();this.tmp=v();this.tails=new WeakMap();
+    this.forward=v();this.follow=true;this.zoom=false;this.orbit=new OrbitCamera();this.yaw=0;this.pitch=.1;this.setup={...physics.setup};this.kitePosition=v();this.kiteRotation=new Quaternion();this.tmp=v();this.tails=new WeakMap();this.pilots=Array.from({length:3},(_,i)=>new PilotModel(i));this.pilotCanvas=new PilotCanvas();
     const r=random(1955);
     this.trees=Array.from({length:18},(_,i)=>{const angle=i/18*Math.PI*2+(r()-.5)*.12,radius=210+r()*80;return {x:Math.sin(angle)*radius,z:Math.cos(angle)*radius,h:4+r()*5,phase:r()*6};});
     this.clouds=Array.from({length:10},()=>({x:(r()-.5)*180,y:30+r()*35,z:-80-r()*100,size:10+r()*15}));
@@ -83,11 +85,8 @@ export class CanvasLandscape {
   drawRival(time){
     const duel=this.duel;if(!duel?.visible)return;
     const c=this.ctx;
-    for(const bot of duel.rivals||[duel.rival]){const anchor=bot.anchor;
-    this.line([v(anchor.x-.15,0,anchor.z),v(anchor.x-.1,.7,anchor.z),v(anchor.x,.99,anchor.z),v(anchor.x+.16,0,anchor.z)],'#465e55',4);
-    this.polygon([v(anchor.x-.22,.7,anchor.z),v(anchor.x-.23,1.3,anchor.z),v(anchor.x+.2,1.3,anchor.z),v(anchor.x+.19,.7,anchor.z)],bot.partyTint||'#397f80');
-    this.line([v(anchor.x-.2,1.22,anchor.z),v(anchor.x-.35,1.05,anchor.z-.1),anchor,v(anchor.x+.27,1.15,anchor.z)],'#c69876',5);
-    const head=this.project(v(anchor.x,1.53,anchor.z));const top=this.project(v(anchor.x,1.72,anchor.z));if(head.z<1){c.fillStyle='#c69876';c.beginPath();c.arc(head.x,head.y,Math.max(2,Math.abs(head.y-top.y)*.65),0,Math.PI*2);c.fill();}
+    for(const [i,bot] of (duel.rivals||[duel.rival]).entries()){
+    const actor=this.pilots[i];actor.update(bot,time);this.pilotCanvas.draw(c,actor,this.camera,this.width,this.height);
     const pos=this.kitePosition.clone(),rot=this.kiteRotation.clone(),scale=this.kiteScale;
     this.kitePosition.copy(bot.position);this.kiteRotation.copy(bot.orientation);this.kiteScale=1;
     const end=this.drawKite(time,false,bot,bot.setup);
@@ -100,10 +99,10 @@ export class CanvasLandscape {
     for(let i=0;i<points.length-1;i++){
       if(i===drawn.broken)continue;const a=points[i],b=points[i+1];if(a.z>1||b.z>1)continue;
       const worn=r.broken<0?r.wearAt(i):0,contact=r.contactAge<.1&&Math.abs(i-r.contactEdge)<2;
-      const thickness=(p.equipment?.thread.diameter||.5)/.5;c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.strokeStyle='#3c514b70';c.lineWidth=1.5+1.2*thickness;c.stroke();c.strokeStyle=worn>.25?'#df9a5e':contact?'#ffe4a0':color;c.lineWidth=(contact?1.8:1.2)*thickness;c.stroke();
+      const thickness=(p.equipment?.thread.diameter||.5)/.5;c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.strokeStyle=worn>.25?'#df9a5e':contact?'#ffe4a0':color;c.lineWidth=(contact?1.2:.85)*thickness;c.stroke();
       if(worn>.2){const x=(a.x+b.x)*.5,y=(a.y+b.y)*.5;c.beginPath();c.moveTo(x-3,y+4);c.lineTo(x,y);c.lineTo(x+4,y+3);c.lineWidth=.8;c.stroke();}
     }
-    if(r.broken>=0)for(const id of [drawn.broken,drawn.broken+1]){const q=points[id];if(q.z>1)continue;c.fillStyle=color;c.beginPath();c.arc(q.x,q.y,2.4,0,Math.PI*2);c.fill();}
+    if(r.broken>=0)for(const id of [drawn.broken,drawn.broken+1]){const q=points[id];if(q.z>1)continue;c.fillStyle=color;c.beginPath();c.arc(q.x,q.y,1.1,0,Math.PI*2);c.fill();}
     if(r.breakAge<.6){const q=this.project(r.breakPoint);c.strokeStyle=`rgba(255,239,192,${1-r.breakAge/.6})`;c.lineWidth=2;c.beginPath();c.arc(q.x,q.y,5+r.breakAge*32,0,Math.PI*2);c.stroke();}
   }
   drawReel(time){
@@ -119,7 +118,7 @@ export class CanvasLandscape {
     return canvasReelOutlet(this.width,this.height,time);
   }
   render(dt,mode,paused){
-    const p=this.physics,intro=mode==='intro',time=p.time,inDuel=!intro&&!!this.duel?.visible;const view=spectatorView(p,this.duel),spectating=view.active,watched=view.pilot,onboard=!intro&&view.onboard;const orbital=!intro&&!onboard&&(this.orbit.active||view.orbital);if(!orbital&&!onboard)positionView(this.camera,inDuel,dt,this.duel?.partyMode?this.duel.npcCount:1);const orbitFrame=onboard?onboardFrame(this.camera,p,dt):orbital?this.orbit.frame(this.camera,watched?.position||p.position,dt):null,duelFrame=inDuel&&!orbital&&!onboard?frameDuel(this.camera,this.duel):null;this.tugOffset=Math.sin(clamp((time-p.lastTug)/.2,0,1)*Math.PI)*12;
+    const p=this.physics,intro=mode==='intro',time=p.time,inDuel=!intro&&!!this.duel?.visible;const focus=pilotFocusTarget(this.duel,this.pilotFocus),view=spectatorView(p,this.duel),spectating=view.active,watched=view.pilot,onboard=!focus&&!intro&&view.onboard;const orbital=!intro&&!onboard&&(this.orbit.active||view.orbital);if(!orbital&&!onboard)positionView(this.camera,inDuel,dt,this.duel?.partyMode?this.duel.npcCount:1);const orbitFrame=onboard?onboardFrame(this.camera,p,dt):orbital?this.orbit.frame(this.camera,focus||watched?.position||p.position,dt):null,duelFrame=inDuel&&!orbital&&!onboard?frameDuel(this.camera,this.duel):null;this.tugOffset=Math.sin(clamp((time-p.lastTug)/.2,0,1)*Math.PI)*12;
     if(intro){this.kitePosition.set((this.width<760?1.7:4.3)+Math.sin(time*.47)*.25,p.profile==='calm'?.5:(this.width<760?7.4:6.1)+Math.sin(time*.7)*.2,-14);this.kiteRotation.setFromEuler(new Euler(-.38,.1,Math.sin(time*.66)*.08-.13));this.kiteScale=1.45;}
     else{this.kitePosition.copy(p.position);this.kiteRotation.copy(p.orientation);this.kiteScale=1;}
     if(intro)this.tmp.set(0,3.8,-24);else if(orbitFrame)this.tmp.copy(orbitFrame.target);else if(this.follow){if(duelFrame)this.tmp.copy(duelFrame.target);else{this.tmp.copy(p.position);this.tmp.y+=p.state==='flying'?-.7:.8;}}else this.tmp.set(Math.sin(this.yaw)*Math.cos(this.pitch),Math.sin(this.pitch),-Math.cos(this.yaw)*Math.cos(this.pitch)).add(this.camera.position);

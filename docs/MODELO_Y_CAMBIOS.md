@@ -1,3 +1,11 @@
+## Ajustes 1.15 · hilo natural y contrincantes vestidos
+
+Se retira el arco Bézier en pantalla de 1.14. El hilo mantiene su forma física y se traslada de forma lineal desde la salida visual del carrete hasta el extremo fijo; una cuerda tensa permanece recta. La presentación no altera colisiones ni vuelve a conectar hebras cortadas. Se afina el grosor y se elimina el contorno oscuro doble de Canvas.
+
+Los puestos vuelven a acercarse parcialmente: 18 m iniciales y margen mínimo de 13 m durante los desplazamientos de los NPC. Se mantienen ocho segundos de preparación, las vidas y los seis segundos de reaparición.
+
+Los contrincantes usan modelos vestidos de menos de 7.500 triángulos, cabezas adaptadas de la referencia y un rig de juego con alcance de brazos, manejo del carrete, seguimiento de mirada y pasos ligados al movimiento real. El punto de salida del carrete coincide con el anclaje físico. El modo de cámara «Ver jugadores» permite inspeccionarlos mientras la partida sigue en curso. Véase `REFERENCIA_PERSONAJES.md`.
+
 ## Ajustes 1.14 · hilo suelto y batallas con vidas
 
 Las restricciones de los hilos cortados solo transmiten tracción: un segmento comprimido no empuja al vecino. Se subdividen al cortar con una separación objetivo de 0,35 m y un presupuesto de menos de 320 enlaces, sin añadir esos enlaces al solucionador de contacto. El suelo aporta fricción. Las curvas de dibujo se suavizan únicamente en hebras cortadas, que ya no bloquean trayectorias; el hilo intacto conserva la geometría de contacto. El anclaje al carrete en primera persona es una representación visual delante de la cámara y no mueve el anclaje físico.

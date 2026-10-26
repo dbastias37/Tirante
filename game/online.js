@@ -57,7 +57,7 @@ export class OnlineGame{
     const playing=['preparing','playing'].includes(d?.phase),left=d?.players.some(p=>p?.left);
     $('online-ready').disabled=!d||playing||left;$('online-ready').textContent=d?.players[d.slot]?.ready?'Cancelar listo':d?.phase==='finished'?'Listo para la revancha ↗':'Estoy listo ↗';
     $('online-return').classList.toggle('hidden',!playing);$('online-room-note').textContent=left?'Un jugador salió. Crea otra sala para un nuevo duelo.':d?.paused?'Esperando la reconexión. La física y el reloj están detenidos.':playing?'El duelo sigue mientras tengas el menú abierto.':'La partida comienza cuando ambos pulsen «Estoy listo».';
-    $('online-room-rules').textContent=d?`${distanceText(d.settings.capacity)} de hilo · ${(d.settings.wind*3.6).toFixed(1)} km/h · 3 vidas · 180 segundos · puestos a 26,2 yd (24 m)`:'';
+    $('online-room-rules').textContent=d?`${distanceText(d.settings.capacity)} de hilo · ${(d.settings.wind*3.6).toFixed(1)} km/h · 3 vidas · 180 segundos · puestos a 19,7 yd (18 m)`:'';
   }
   render(p,duel,now=performance.now()){
     const d=this.latest;if(!d?.match)return;const m=d.match,own=d.slot,views=own?[duel.rival,p]:[p,duel.rival],fresh=this.visualSnapshot!==d;

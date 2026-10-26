@@ -1,6 +1,6 @@
 # TIRANTE · El pulso del viento
 
-Simulador de volantines, versión 1.14.0, publicado desde este repositorio en Render.
+Simulador de volantines, versión 1.15.0, publicado desde este repositorio en Render.
 
 ## Instalación actual en Render
 
@@ -22,6 +22,14 @@ La instalación actual usa el plan gratuito, una instancia y `DATA_DIR=/tmp/tira
 - Party local contra 1–3 NPC, Rastro de luz contrarreloj y duelo online para dos personas.
 - Interfaz compacta para móvil, renderer WebGL y alternativa Canvas.
 - Servidor Node.js, base SQLite, almacenamiento de estampados y pruebas automatizadas.
+
+## Cambios de la versión 1.15.0
+
+- Hilo más fino y natural, sin la curva de pantalla impuesta en 1.14 ni el contorno grueso de Canvas. Se conservan la holgura física, la unión al carrete y los tirantes, y la flexibilidad después del corte.
+- Puestos a **18 m (19,7 yd)**, con los ocho segundos de elevación y las reglas de vidas anteriores.
+- Contrincantes vestidos y articulados, adaptados a partir del análisis del modelo Body Chan / Body Kun aportado. Miran su volantín, manejan el carrete, acompañan tirones y caminan cuando se desplazan; la salida del carrete coincide con el anclaje físico.
+- Botón **Ver jugadores / P** para observar a los participantes en la partida. Pulsa otra vez para cambiar de rival; **C o V** vuelven al cielo.
+- Modelos compartidos entre WebGL y Canvas, con geometría acotada, agrupación de piezas estáticas y profundidad por píxel en el renderer alternativo. [Análisis y adaptación de la referencia](docs/REFERENCIA_PERSONAJES.md).
 
 ## Cambios de la versión 1.14.0
 

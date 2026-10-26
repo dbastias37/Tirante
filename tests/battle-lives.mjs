@@ -27,4 +27,4 @@ for(let loss=1;loss<=3;loss++){duel.player.state='grounded';tick(duel,dt);assert
 const room={code:'LIVES123',round:1,settings:{capacity:914.4,profile:'breeze',wind:5.5},players:[{setup:{},seq:0},{setup:{},seq:0}]};
 const online=createMatch(room);online.state='playing';online.player.cutLine(10,.3);tick(online,dt);const restored=unpackMatch(packMatch(online));assert.equal(restored.player.lives,2);assert.equal(restored.player.respawnAt,online.player.respawnAt);assert.equal(restored.player.eliminated,true);
 tick(online,RESPAWN_SECONDS+.1);tick(restored,RESPAWN_SECONDS+.1);assert.equal(restored.player.lifeSerial,2);assert.ok(restored.player.position.distanceTo(online.player.position)<1e-9);assert.equal(restored.player.lives,2);room.match=packMatch(restored);assert.deepEqual(snapshot(room,0,0).match,snapshot(room,1,0).match);
-console.log('PASS: 24 m spacing, 3/5/10 lives, one loss per fall/cut, 6 s respawn, no early victory, timed/lms rules, spectator return and online persistence.');
+console.log('PASS: 18 m spacing, 3/5/10 lives, one loss per fall/cut, 6 s respawn, no early victory, timed/lms rules, spectator return and online persistence.');

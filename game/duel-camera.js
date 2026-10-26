@@ -1,6 +1,7 @@
 import {Vector3} from './vendor/three.module.js';
 export const PILOT_EYE=new Vector3(0,1.72,1.1);
 const backEye=PILOT_EYE.clone().add(new Vector3(0,0,1.15));
+export function pilotFocusTarget(duel,index){const p=duel?.visible&&Number.isInteger(index)&&index>=0?(duel.rivals||[duel.rival])[index]:null;return p?p.anchor.clone().setY(.95):null;}
 // Moving the view must not move the pilot or pull their physical line.
 export function positionView(camera,inDuel,dt,rivalCount=1){
   const eye=inDuel?backEye.clone().add(new Vector3(0,0,Math.max(0,rivalCount-1)*.7)):PILOT_EYE;

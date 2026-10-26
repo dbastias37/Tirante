@@ -1,4 +1,4 @@
-export const PILOT_SPACING=24;
+export const PILOT_SPACING=18;
 export const LAUNCH_SECONDS=8;
 export const RESPAWN_SECONDS=6;
 export const DUEL_SECONDS=180;

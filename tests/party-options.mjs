@@ -10,7 +10,7 @@ const custom={rules:'last-man',profile:'strong',wind:9,npcs:[{name:'Luna <azul>'
 const p=new KitePhysics(),d=new PartyCommission(p);d.startParty(3,'hard',custom);
 assert.equal(d.rules,'last-man');assert.equal(d.roster[1].name,'Luna <azul>');assert.equal(d.roster[1].pilot.setup.printId,custom.npcs[0].printId);assert.equal(d.roster[2].pilot.setup.sailStyle,'solid');
 assert.ok(d.roster.every(e=>e.pilot.windSpeed===9&&e.pilot.profile==='strong'));
-for(let i=0;i<4;i++)for(let j=i+1;j<4;j++)assert.ok(d.roster[i].pilot.anchor.distanceTo(d.roster[j].pilot.anchor)>=24,'Twenty-four metres of initial clearance for every pair');
+for(let i=0;i<4;i++)for(let j=i+1;j<4;j++)assert.ok(d.roster[i].pilot.anchor.distanceTo(d.roster[j].pilot.anchor)>=18,'Eighteen metres of initial clearance for every pair');
 assert.equal(escapeHTML('<img src=x onerror="bad">'),'&lt;img src=x onerror=&quot;bad&quot;&gt;');
 assert.deepEqual(cleanPartyOptions(JSON.parse(JSON.stringify(custom))),cleanPartyOptions(custom),'Saved customization round-trips');
 const invalid=cleanPartyOptions({rules:'no',wind:-100,profile:'no',npcs:[{name:'\n',printId:'../../secret',sailStyle:'bad',paperColor:'red'}]});assert.equal(invalid.npcs[0].name,'Mateo');assert.equal(invalid.npcs[0].printId,'');assert.equal(invalid.wind,5.5);
