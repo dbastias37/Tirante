@@ -1,3 +1,4 @@
+import {distanceHTML} from './units.js';
 // One set of instruments, moved into a sheet on phones and short viewports.
 // Keeping the original nodes preserves their values, listeners and focus.
 export class CompactFlightUI {
@@ -49,7 +50,7 @@ export class CompactFlightUI {
     this.$('pause-audio').textContent = `Sonido: ${audio?.enabled ? 'activado' : 'apagado'}`;
     this.$('pause-assists').textContent = `Ayudas visuales: ${assists ? 'sí' : 'no'}`;
     if (!this.query.matches) return;
-    this.$('compact-line').textContent = p.lineLength.toFixed(1) + ' m';
+    this.$('compact-line').innerHTML = distanceHTML(p.lineLength);
     this.$('compact-wind').textContent = Math.round(p.windKmh) + ' km/h';
     this.$('compact-energy').textContent = Math.round(p.energy) + '%';
     this.$('compact-energy-bar').style.width = p.energy + '%';

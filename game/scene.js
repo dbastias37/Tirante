@@ -7,10 +7,11 @@ import {ArticulatedTail,TAIL_VERTICES} from './tail.js';
 import {equipmentStats} from './equipment.js';
 import {createReelModel,disposeModel} from './equipment-models.js';
 import {TrailView,drawCanvasTrail} from './trail-view.js';
-import {frameDuel,positionView,handViewOffset} from './duel-camera.js';
+import {frameDuel,positionView} from './duel-camera.js';
+import {reelViewport} from './reel-view.js';
 import * as THREE from './vendor/three.module.js';
 import {clamp,mix,configuration} from './physics.js';
-import {PAPER_OPACITY,FIELD_SIZE,CAMERA_FAR,SKY_RADIUS,HORIZON_RADIUS,FOG_NEAR,FOG_FAR,renderPixelRatio,terrainHeight} from './render-settings.js';
+import {PAPER_OPACITY,FIELD_SIZE,CAMERA_NEAR,CAMERA_FAR,SKY_RADIUS,HORIZON_RADIUS,FOG_NEAR,FOG_FAR,renderPixelRatio,terrainHeight} from './render-settings.js';
 
 const PALETTE={terracotta:0xc96343,teal:0x397f80,saffron:0xd3a138,plum:0x92709b};
 const v3=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
@@ -86,7 +87,7 @@ export class Landscape {
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
     this.renderer.setPixelRatio(renderPixelRatio(window.devicePixelRatio));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.25;
     this.scene=new THREE.Scene();this.scene.fog=new THREE.Fog(0xc2cfbe,FOG_NEAR,FOG_FAR);
-    this.camera=new THREE.PerspectiveCamera(52,1,.05,CAMERA_FAR);this.camera.position.set(0,1.7,1.2);this.scene.add(this.camera);
+    this.camera=new THREE.PerspectiveCamera(52,1,CAMERA_NEAR,CAMERA_FAR);this.camera.position.set(0,1.7,1.2);this.scene.add(this.camera);
     this.targetCamera=new THREE.PerspectiveCamera();this.scene.add(new THREE.HemisphereLight(0xd7edf3,0x777f46,2.2));
     const sun=new THREE.DirectionalLight(0xffe4b6,3.1);sun.position.set(-35,70,-45);this.scene.add(sun);
     const fill=new THREE.DirectionalLight(0xc1e5ee,.7);fill.position.set(10,8,6);this.scene.add(fill);
@@ -102,7 +103,7 @@ export class Landscape {
       const wideGeometry=new THREE.BufferGeometry();for(const attr of ['position','color'])wideGeometry.setAttribute(attr,new THREE.Float32BufferAttribute(new Float32Array(40*6*3),3));rope.userData.ribbon=new THREE.Mesh(wideGeometry,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));rope.userData.ribbon.frustumCulled=false;rope.userData.ribbon.visible=false;this.scene.add(rope.userData.ribbon);rope.material.visible=false;
     }
     this.clashGlow=mesh(new THREE.SphereGeometry(.07,8,6),0xffcf73);this.clashGlow.material=new THREE.MeshBasicMaterial({color:0xffd780});this.clashGlow.visible=false;this.scene.add(this.clashGlow);
-    this.kiteShadow=mesh(new THREE.CircleGeometry(.43,24),0x445037);this.kiteShadow.material.transparent=true;this.kiteShadow.material.opacity=.15;this.kiteShadow.rotation.x=-Math.PI/2;this.scene.add(this.kiteShadow);
+    this.kiteShadow=mesh(new THREE.CircleGeometry(.43,24),0x445037);this.kiteShadow.material.transparent=true;this.kiteShadow.material.opacity=.15;this.kiteShadow.material.depthWrite=false;this.kiteShadow.material.polygonOffset=true;this.kiteShadow.material.polygonOffsetFactor=-1;this.kiteShadow.material.polygonOffsetUnits=-2;this.kiteShadow.rotation.x=-Math.PI/2;this.scene.add(this.kiteShadow);
     this.screenPoint=v3();this.nosePoint=v3();this.worldEnd=v3();this.worldStart=v3();this.forward=v3();this._temp=v3();
     this.resize();this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(document.body);
   }
@@ -125,13 +126,15 @@ export class Landscape {
     for(let i=0;i<17;i++){const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,opacity:.65,depthWrite:false,fog:true,color:0xffffff}));sprite.position.set((rand()-.5)*250,28+rand()*40,-65-rand()*130);sprite.scale.set(30+rand()*38,13+rand()*12,1);sprite.userData.baseX=sprite.position.x;this.scene.add(sprite);this.clouds.push(sprite);}
   }
   createLandscape(){
-    const farGround=mesh(new THREE.PlaneGeometry(12000,12000),0x64894f);farGround.rotation.x=-Math.PI/2;farGround.position.y=-.04;this.scene.add(farGround);
+    const surround=new THREE.Shape();surround.moveTo(-6000,-6000);surround.lineTo(6000,-6000);surround.lineTo(6000,6000);surround.lineTo(-6000,6000);surround.closePath();
+    const opening=new THREE.Path(),edge=FIELD_SIZE/2;opening.moveTo(-edge,-edge);opening.lineTo(-edge,edge);opening.lineTo(edge,edge);opening.lineTo(edge,-edge);opening.closePath();surround.holes.push(opening);
+    const farGround=mesh(new THREE.ShapeGeometry(surround),0x64894f);farGround.rotation.x=-Math.PI/2;farGround.userData.groundSurround=true;this.scene.add(farGround);
     const terrain=new THREE.PlaneGeometry(FIELD_SIZE,FIELD_SIZE,64,64);terrain.rotateX(-Math.PI/2);const pos=terrain.attributes.position;const colors=[];
     const color=new THREE.Color(),c1=new THREE.Color(0x548447),c2=new THREE.Color(0x7fa354);
     for(let i=0;i<pos.count;i++){const x=pos.getX(i),z=pos.getZ(i);pos.setY(i,terrainHeight(x,z));const shade=(Math.sin(x*.13+z*.12)+Math.sin(x*.3-z*.09))*.15+.4;color.copy(c1).lerp(c2,shade);colors.push(color.r,color.g,color.b);}
     terrain.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));terrain.computeVertexNormals();this.scene.add(new THREE.Mesh(terrain,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1})));
     const pathVertices=[];for(let i=0;i<100;i++){const z=8-i*3.6,z2=z-3.6;const x=3+Math.sin(-z*.045)*3,x2=3+Math.sin(-z2*.045)*3;const w=.7;for(const [a,b] of [[x-w,z],[x+w,z],[x2+w,z2],[x-w,z],[x2+w,z2],[x2-w,z2]])pathVertices.push(a,terrainHeight(a,b)+.025,b);}
-    const pathGeo=new THREE.BufferGeometry();pathGeo.setAttribute('position',new THREE.Float32BufferAttribute(pathVertices,3));pathGeo.computeVertexNormals();this.scene.add(new THREE.Mesh(pathGeo,new THREE.MeshStandardMaterial({color:0xc3b890,roughness:1,side:THREE.DoubleSide})));
+    const pathGeo=new THREE.BufferGeometry();pathGeo.setAttribute('position',new THREE.Float32BufferAttribute(pathVertices,3));pathGeo.computeVertexNormals();this.scene.add(new THREE.Mesh(pathGeo,new THREE.MeshStandardMaterial({color:0xc3b890,roughness:1,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-4})));
     this.createMountains();
     const rand=seeded(81);for(let i=0;i<18;i++){const angle=i/18*Math.PI*2+(rand()-.5)*.12,radius=210+rand()*80;this.createTree(Math.sin(angle)*radius,Math.cos(angle)*radius,4+rand()*5);}
     // A simple wind ribbon on a field post gives a second, diegetic wind cue.
@@ -152,19 +155,18 @@ export class Landscape {
     for(let i=0;i<3;i++){const crown=mesh(new THREE.IcosahedronGeometry(height*(.28-i*.04),0),[0x607c56,0x69825c,0x70885f][i]);crown.scale.set(1,.85,1);crown.position.set(Math.sin(i*4)*height*.12,height*(.56+i*.14),Math.cos(i*3)*height*.1);tree.add(crown);}tree.position.set(x,terrainHeight(x,z),z);this.scene.add(tree);
   }
   createReel(){
-    this.handRig=new THREE.Group();this.handRig.position.set(.29,-.255,-.57);this.handRig.rotation.set(.08,-.38,-.2);this.handRig.scale.setScalar(.85);this.camera.add(this.handRig);
-    this.spool=new THREE.Group();this.handRig.add(this.spool);
-    this.configureReel(this.physics.setup);
-    const handMat=new THREE.MeshStandardMaterial({color:0xc59675,roughness:.95});
-    const palm=new THREE.Mesh(new THREE.CapsuleGeometry(.039,.09,4,9),handMat);palm.rotation.z=-.55;palm.position.set(.115,-.045,.035);this.handRig.add(palm);
-    for(let i=0;i<4;i++){const finger=new THREE.Mesh(new THREE.CapsuleGeometry(.011,.053,3,7),handMat);finger.rotation.set(.1,.2,-.65);finger.position.set(.105+i*.014,-.035-i*.018,-.015+i*.013);this.handRig.add(finger);}
-    const thumb=new THREE.Mesh(new THREE.CapsuleGeometry(.015,.043,3,8),handMat);thumb.rotation.set(.2,.2,.9);thumb.position.set(.064,.006,.07);this.handRig.add(thumb);
-    const sleeve=mesh(new THREE.CylinderGeometry(.055,.078,.39,9),0xc9cab4);sleeve.rotation.z=.42;sleeve.position.set(.19,-.23,.08);this.handRig.add(sleeve);
-    const cuff=mesh(new THREE.CylinderGeometry(.057,.06,.045,9),0xa3ad97);cuff.rotation.z=.42;cuff.position.set(.124,-.077,.078);this.handRig.add(cuff);
-    this.ropeAnchor=new THREE.Object3D();this.ropeAnchor.position.set(0,.085,0);this.handRig.add(this.ropeAnchor);
+    this.reelScene=new THREE.Scene();this.reelCamera=new THREE.PerspectiveCamera(48,1,.1,10);this.reelCamera.position.set(0,.05,3.2);this.reelCamera.lookAt(0,0,0);
+    this.reelScene.add(new THREE.HemisphereLight(0xfff4da,0x536851,2.7));const light=new THREE.DirectionalLight(0xffead1,3);light.position.set(-3,5,4);this.reelScene.add(light);
+    this.reelRig=new THREE.Group();this.reelRig.rotation.set(.12,.65,-.16);this.reelScene.add(this.reelRig);this.spool=new THREE.Group();this.reelRig.add(this.spool);this.configureReel(this.physics.setup);
+  }
+  renderReel(dt,paused){
+    const p=this.physics,box=reelViewport(this.width,this.height);
+    if(!paused&&p.action!=='hold')this.spool.rotation.z+=dt*(p.action==='reel'?3:-3)*(p.boost?2.5:1);
+    this.reelRig.position.y=-Math.sin(clamp((p.time-p.lastTug)/.2,0,1)*Math.PI)*.06;
+    const r=this.renderer;r.autoClear=false;r.clearDepth();r.setViewport(box.x,this.height-box.y-box.size,box.size,box.size);r.render(this.reelScene,this.reelCamera);r.setViewport(0,0,this.width,this.height);r.autoClear=true;
   }
   resize(){this.width=window.innerWidth;this.height=window.innerHeight;this.camera.aspect=this.width/this.height;this.camera.updateProjectionMatrix();this.renderer.setSize(this.width,this.height,false);}
-  configureReel(s){const key=[s.reelType,s.bearingType,s.lineType].join('/');if(this.reelKey===key)return;this.reelKey=key;if(this.reelModel){this.spool.remove(this.reelModel);disposeModel(this.reelModel);}const e=equipmentStats(s);this.reelModel=createReelModel(e.reel,e.bearing,e.thread);this.reelModel.scale.setScalar(.105*(e.reel.diameter/15.2)**.45);this.reelModel.rotation.y=Math.PI/2;this.spool.add(this.reelModel);}
+  configureReel(s){const key=[s.reelType,s.bearingType,s.lineType].join('/');if(this.reelKey===key)return;this.reelKey=key;if(this.reelModel){this.spool.remove(this.reelModel);disposeModel(this.reelModel);}const e=equipmentStats(s);this.reelModel=createReelModel(e.reel,e.bearing,e.thread);this.reelModel.scale.setScalar(.88*(e.reel.diameter/20.3)**.3);this.spool.add(this.reelModel);}
   configure(s){this.kite.configure(s);this.configureReel(s);}
   drag(dx,dy){if(spectatorView(this.physics,this.duel).onboard)return;if(this.orbit.active||spectatorView(this.physics,this.duel).orbital){this.orbit.drag(dx,dy);return;}if(this.follow){this.camera.getWorldDirection(this.forward);this.yaw=Math.atan2(this.forward.x,-this.forward.z);this.pitch=Math.asin(this.forward.y);}this.follow=false;this.yaw-=dx*.0035;this.pitch=clamp(this.pitch+dy*.003,-.35,1.4);}
   updateTether(line,p){
@@ -196,13 +198,9 @@ export class Landscape {
     this.targetCamera.position.copy(this.camera.position);this.targetCamera.lookAt(this._temp);
     if(orbital||onboard)this.camera.quaternion.copy(this.targetCamera.quaternion);else this.camera.quaternion.slerp(this.targetCamera.quaternion,1-Math.exp(-dt*(intro?2:3.5)));
     const fov=intro?50:orbitFrame?orbitFrame.fov:duelFrame?(this.follow?duelFrame.fov:74):(this.zoom?35:this.width<760?63:54);this.camera.fov=mix(this.camera.fov,fov,1-Math.exp(-dt*6));this.camera.updateProjectionMatrix();
-    const tugPulse=Math.sin(clamp((p.time-p.lastTug)/.2,0,1)*Math.PI);
-    this.handRig.visible=!intro&&!orbital&&!spectating;this.handRig.position.y=(this.width<760?-.14:-.255)+Math.sin(p.time*1.6)*.002-tugPulse*.026;this.handRig.position.x=this.width<760?.11:.29;this.handRig.position.z=-.57;this.handRig.position.add(handViewOffset(this.camera));
-    if(!paused&&p.action!=='hold')this.spool.rotation.x+=dt*(p.action==='reel'?3:-3)*(p.boost?2.5:1);
     this.scene.updateMatrixWorld();
     this.worldEnd.copy(this.kite.junction);this.kite.group.localToWorld(this.worldEnd);
-    if(intro)this.worldStart.set(0,.4,1);else this.ropeAnchor.getWorldPosition(this.worldStart);
-    if(!intro&&!orbital){const desired=this.camera.worldToLocal(p.anchor.clone()),actual=this.camera.worldToLocal(this.worldStart.clone());this.handRig.position.add(desired.sub(actual));this.scene.updateMatrixWorld();}
+    if(intro)this.worldStart.set(0,.4,1);
     this.rope.userData.fray.visible=!intro;this.rope.userData.tips.visible=!intro&&p.rope.broken>=0;
     if(intro){this.rope.geometry.attributes.color.array.fill(1);this.rope.geometry.attributes.color.needsUpdate=true;const attr=this.rope.geometry.attributes.position;for(let i=0;i<40;i++){for(let j=0;j<2;j++){const t=(i+j)/40;this._temp.copy(this.worldStart).lerp(this.worldEnd,t);this._temp.y-=Math.sin(t*Math.PI)*.32;attr.setXYZ(i*2+j,this._temp.x,this._temp.y,this._temp.z);}}attr.needsUpdate=true;this.rope.geometry.setDrawRange(0,80);}
     else this.updateTether(this.rope,p);
@@ -212,7 +210,7 @@ export class Landscape {
       if(visible){visual.kite.group.position.copy(b.position);visual.kite.group.quaternion.copy(b.orientation);visual.kite.animate(p.time,b.bend,b.wind.length(),b);visual.pilot.position.set(b.anchor.x,0,b.anchor.z);this.updateTether(visual.rope,b);}
     });if(this.clashGlow.visible)this.clashGlow.position.copy(this.duel.contactPoint);
     this.trailView.update(!intro?this.trail:null,this.camera,p.time);
-    this.sky.position.copy(this.camera.position);this.renderer.render(this.scene,this.camera);
+    this.sky.position.copy(this.camera.position);this.renderer.render(this.scene,this.camera);if(!intro&&!orbital&&!spectating)this.renderReel(dt,paused);
     this.screenPoint.copy(this.kite.group.position).project(this.camera);this.nosePoint.set(0,.4,0);this.kite.group.localToWorld(this.nosePoint);this.nosePoint.project(this.camera);
     const projected=q=>{const o=q.clone().project(this.camera);return {x:(o.x*.5+.5)*this.width,y:(.5-o.y*.5)*this.height,behind:o.z>1,visible:o.z<1&&Math.abs(o.x)<.95&&Math.abs(o.y)<.95};};
     return {trail:this.trail?.active&&this.trail.target?projected(this.trail.target):null,rivals:rivalVisible?rivals.map(b=>projected(b.position)):[],rival:rivalVisible?projected(this.duel.rival.position):null,clash:this.duel?.contact?projected(this.duel.contactPoint):null,x:(this.screenPoint.x*.5+.5)*this.width,y:(-.5*this.screenPoint.y+.5)*this.height,visible:this.screenPoint.z<1&&Math.abs(this.screenPoint.x)<.94&&Math.abs(this.screenPoint.y)<.95,angle:Math.atan2((this.nosePoint.x-this.screenPoint.x)*this.width,(this.nosePoint.y-this.screenPoint.y)*this.height)*180/Math.PI,size:Math.abs((this.nosePoint.y-this.screenPoint.y)*this.height)};

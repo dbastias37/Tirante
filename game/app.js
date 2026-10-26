@@ -11,6 +11,8 @@ import {drawContact} from './contact-view.js';
 import {Landscape} from './scene.js';
 import {OnlineGame} from './online.js';
 import {CanvasLandscape} from './canvas-scene.js';
+import {GameFlowUI} from './game-flow-ui.js';
+import {distanceHTML,distanceText,yardsValue,metersValue,populateCapacities} from './units.js';
 import {cleanEquipment} from './equipment.js';
 import {EquipmentUI} from './equipment-ui.js';
 import {spectatorView} from './spectator-camera.js';
@@ -36,10 +38,10 @@ if(['breeze','gusts','strong','calm'].includes(saved.profile))physics.profile=sa
 if(Number.isFinite(saved.windSpeed))physics.windSpeed=clamp(saved.windSpeed,1,12);
 let record=Number.isFinite(saved.record)?Math.max(0,saved.record):0,assists=saved.assists!==false;
 const trail=new LightTrail(physics);let trailBest=saved.trailVersion===TRAIL_VERSION&&Number.isFinite(saved.trailBest)&&saved.trailBest>0?saved.trailBest:null,trailResultShown=false,trailFinishedAt=0,trailNewBest=false;
-let online=null,compactUI=null,workshopDesign=null,partyUI=null,equipmentUI=null;
-let landscape, mode='intro',modal=null,previousFocus=null,setupChanged=false,toastTimeout,drag=null,audio=null,shiftDown=false,boostLatched=false;
+let online=null,compactUI=null,workshopDesign=null,partyUI=null,equipmentUI=null,flow=null;
+let landscape, mode='intro',modal=null,previousFocus=null,setupChanged=false,onlineSettingsReturn=false,toastTimeout,drag=null,audio=null,shiftDown=false,boostLatched=false;
 const keys=new Set(),pointers=new Map();let zoom=false,graphTime=0,lastUi=0,windHistory=Array(48).fill(14),accumulator=0,lastTime=0;
-function save(){try{localStorage.setItem(STORAGE,JSON.stringify({setup,profile:trail.saved?.profile||physics.profile,windSpeed:trail.saved?.windSpeed??physics.windSpeed,record,assists,lineCapacity:trail.saved?.lineCapacity??physics.lineCapacity,duelStats,partyCount,partyOptions:partyUI?.value||saved.partyOptions,trailBest,trailVersion:TRAIL_VERSION}));storageAvailable=true;}catch{storageAvailable=false;}}
+function save(){try{localStorage.setItem(STORAGE,JSON.stringify({setup,profile:trail.saved?.profile||physics.profile,windSpeed:trail.saved?.windSpeed??physics.windSpeed,record,assists,lineCapacity:trail.saved?.lineCapacity??physics.lineCapacity,duelStats,partyCount,npcLevel:$('npc-level').value,partyOptions:partyUI?.value||saved.partyOptions,trailBest,trailVersion:TRAIL_VERSION}));storageAvailable=true;}catch{storageAvailable=false;}}
 function toast(message){$('toast').textContent=message;$('toast').classList.remove('hidden');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>$('toast').classList.add('hidden'),4200);}
 function releaseAll(){keys.clear();pointers.clear();shiftDown=false;boostLatched=false;if(!online?.active){physics.sawing=false;physics.setControls('hold',false);}updateControlState();}
 const spectator=()=>spectatorView(physics,duel);
@@ -59,12 +61,34 @@ function updateControlState(){
   $('control-dock').classList.toggle('boosting',boost&&physics.action!=='hold');
   $('tug-label').textContent=requested?'Tirón ×2':'Tirón';
 }
-function setMode(next){mode=next;compactUI?.setFlight(next==='flight');releaseAll();$('intro').classList.toggle('hidden',next!=='intro');$('intro-weather').classList.toggle('hidden',next!=='intro');$('intro-footer').classList.toggle('hidden',next!=='intro');$('flight-ui').classList.toggle('hidden',next!=='flight');document.querySelector('.topbar').classList.toggle('flight-mode',next==='flight');if(next==='flight'){landscape.follow=true;updateFollow();}updateUI();}
+function setMode(next){mode=next;compactUI?.setFlight(next==='flight');releaseAll();$('intro').classList.toggle('hidden',next!=='intro');if(next==='flight')flow?.hide();else if(flow?.state==='hidden')flow.show('menu');$('flight-ui').classList.toggle('hidden',next!=='flight');document.querySelector('.topbar').classList.toggle('flight-mode',next==='flight');if(next==='flight'){landscape.follow=true;updateFollow();}updateUI();}
 function openModal(id){compactUI?.setCameraTools(false);if(id==='trail-modal'&&online?.active){online.open();return;}if(id==='trail-modal')updateTrailMenu();if(trail.visible&&['workshop','wind-modal','equipment-modal'].includes(id)){toast('Termina el recorrido para cambiar el volantín o el viento.');return;}if(online?.active&&id==='commission-modal')id='online-modal';if(online?.active&&['workshop','wind-modal','equipment-modal'].includes(id)){toast('Sal de la sala para cambiar tus ajustes.');return;}if(duel.active&&['workshop','wind-modal','equipment-modal'].includes(id)){toast('Termina la comisión para cambiar el volantín o el viento.');return;}releaseAll();if(id==='commission-modal')updateCommissionMenu();previousFocus=document.activeElement;if(id==='workshop'){setupChanged=false;updateWorkshop();}modal=id;all('#overlay>.modal').forEach(el=>el.classList.toggle('hidden',el.id!==id));$('overlay').classList.remove('hidden');$(id).scrollTop=0;if(id==='equipment-modal')equipmentUI.paint();if(id==='wind-modal')updateWindSettings();if(id==='pause-modal')$('resume-button').innerHTML=mode==='intro'?'Volver al inicio <span>↗</span>':'Continuar <span>↗</span>';requestAnimationFrame(()=>$(id).querySelector('button')?.focus({preventScroll:true}));}
-function closeModal(){const old=modal;modal=null;$('overlay').classList.add('hidden');if(['workshop','equipment-modal'].includes(old)&&setupChanged){physics.reset();setupChanged=false;if(mode==='flight')toast('Ajustes guardados. Prueba un nuevo lanzamiento.');}previousFocus?.focus?.({preventScroll:true});updateUI();}
-function goFlying(){if(online?.active){leaveCommission();return;}stopTrail();duel.stop();closeModal();physics.reset();setMode('flight');toast(compactUI?.query.matches?'Mantén Soltar o Recoger. Activa Boost para acelerar.':'Q / E: soltar y recoger · Shift: boost · Shift + Espacio: doble tirón.');}
+function closeModal(){const old=modal;modal=null;if(old==='online-settings-modal'&&onlineSettingsReturn){onlineSettingsReturn=false;openModal('online-modal');flow?.refresh();return;}$('overlay').classList.add('hidden');if(['workshop','equipment-modal'].includes(old)&&setupChanged){physics.reset();setupChanged=false;if(mode==='flight')toast('Ajustes guardados. Prueba un nuevo lanzamiento.');}previousFocus?.focus?.({preventScroll:true});flow?.refresh();updateUI();}
+function goFlying(){if(online?.active){leaveCommission();return;}stopTrail();duel.stop();closeModal();physics.reset();landscape.orbit.active=false;setMode('flight');toast(compactUI?.query.matches?'Mantén Soltar o Recoger. Activa Boost para acelerar.':'Q / E: soltar y recoger · Shift: boost · Shift + Espacio: doble tirón.');}
 function launch(){if(modal||mode!=='flight'||duel.visible||trail.visible)return;physics.launch();updateControlState();landscape.follow=true;updateFollow();if(physics.windSpeed<1.8||physics.profile==='calm')toast('Puedes probar, pero sin suficiente viento volverá a tierra.');updateUI();}
 function tug(double=physics.boost){if(spectator().active)return;if(mode!=='flight'||modal||duel.state==='preparing'||duel.state==='finished'||trail.state==='preparing'||trail.state==='finished')return;if(physics.state!=='flying'){launch();return;}if(online?.active){online.tug(double);return;}if(physics.tug(double))updateUI();else if(physics.energy<(double?14:7))toast('Falta energía para ese tirón. Suelta los controles para descansar.');}
+
+function showFront(page='menu'){leaveCommission();setMode('intro');flow.show(page);accumulator=0;}
+function beginPreparation(choice){showFront('modes');flow.select(choice);}
+function chooseGameMode(choice){
+  if(online?.active){online.leave();duel.stop();physics.networkControlled=false;duel.rival.networkControlled=false;physics.anchor.set(0,1.35,0);physics.configure(setup);physics.reset();landscape.configure(setup);}
+  if(['party','last-man'].includes(choice)){partyUI.value.rules=choice==='last-man'?'last-man':'timed';$('party-rules').value=partyUI.value.rules;}
+  if(choice==='online')$('online-capacity').value=physics.lineCapacity;
+  save();
+}
+function preparationSnapshot(choice){
+  const fixed=choice==='trail',party=['party','last-man'].includes(choice),net=choice==='online';
+  const profile=fixed?'breeze':party?partyUI.value.profile:net?$('online-wind').value:physics.profile;
+  return {setup:fixed?{...DEFAULT_SETUP,...appearance(setup)}:setup,fixed,capacity:fixed?65:net?Number($('online-capacity').value):physics.lineCapacity,wind:fixed?5.5:party?partyUI.value.wind:net?Number($('online-strength').value):physics.profile==='calm'?0:physics.windSpeed,weather:{breeze:'Brisa constante',gusts:'Entre ráfagas',strong:'Viento firme',calm:'En calma'}[profile],opponents:party?`${partyCount} rivales · ${partyUI.value.npcs.slice(0,partyCount).map(n=>n.name).join(', ')} · ${$('npc-level').value==='hard'?'Competitivo':'Hábil'}`:net?'Rival humano · el anfitrión elige las condiciones':fixed?'8 destellos · 90 segundos · equipo equilibrado':'Un vuelo sin rivales ni límite de tiempo',audio:!!audio?.enabled,assists};
+}
+function editPreparation(kind,choice){
+  if(kind==='help'){openModal('help-modal');return;}
+  if(kind==='kite'){openModal('workshop');if(choice==='trail')setWorkshopTab('design');return;}
+  if(kind==='equipment'){openModal('equipment-modal');return;}
+  if(choice==='online'){onlineSettingsReturn=false;openModal('online-settings-modal');return;}
+  openModal(['party','last-man'].includes(choice)?'commission-modal':'wind-modal');
+}
+function beginPreparedGame(choice){if(choice==='online'){online.open();return;}if(choice==='trail')startTrail();else if(['party','last-man'].includes(choice))startCommission();else goFlying();}
 
 function updateTrailMenu(){
   $('trail-start').textContent=trail.visible?'Empezar de nuevo ↺':'Comenzar recorrido ↗';
@@ -79,7 +103,7 @@ function showTrailResult(){
   const r=trail.result;if(!r)return;trailResultShown=true;$('trail-medal').textContent=r.won?`MEDALLA DE ${r.medal.toUpperCase()}`:'RASTRO DE LUZ';$('trail-result-title').textContent=r.won?'El recorrido es tuyo.':'Queda cielo por descubrir.';$('trail-result-time').textContent=formatTime(r.seconds,true);$('trail-result-captures').textContent=`${r.collected} DE ${r.total} DESTELLOS`;$('trail-result-reason').textContent=r.reason;$('trail-new-best').textContent=trailNewBest?'Nueva mejor vuelta en este navegador.':trailBest?`Tu mejor vuelta: ${formatTime(trailBest,true)}`:'Prueba soltadas cortas y espera la respuesta del volantín.';openModal('trail-result-modal');
 }
 function updateCamera(){
-  const orbit=!spectator().onboard&&(landscape.orbit.active||spectator().orbital);document.body.classList.toggle('orbiting',orbit&&mode==='flight');$('camera-button').innerHTML=`Cámara: ${spectator().onboard?'a bordo':orbit?'orbital':'1ª persona'} <kbd>V</kbd>`;$('camera-button').setAttribute('aria-pressed',orbit);$('orbit-zoom').classList.toggle('hidden',!orbit);$('orbit-distance').textContent=landscape.orbit.distance.toFixed(1)+' m';
+  const orbit=!spectator().onboard&&(landscape.orbit.active||spectator().orbital);document.body.classList.toggle('orbiting',orbit&&mode==='flight');$('camera-button').innerHTML=`Cámara: ${spectator().onboard?'a bordo':orbit?'orbital':'1ª persona'} <kbd>V</kbd>`;$('camera-button').setAttribute('aria-pressed',orbit);$('orbit-zoom').classList.toggle('hidden',!orbit);$('orbit-distance').innerHTML=distanceHTML(landscape.orbit.distance);
 }
 function toggleCamera(){if(spectator().active){duel.spectatorView=spectator().mode==='kite'?'onboard':spectator().mode==='onboard'?'battle':'kite';landscape.orbit.active=false;landscape.follow=true;updateFollow();return;}landscape.orbit.active=!landscape.orbit.active;landscape.follow=true;updateFollow();}
 function centerCamera(){if(spectator().onboard)return;if(landscape.orbit.active||spectator().orbital)landscape.orbit.reset();else{landscape.follow=!landscape.follow;if(!landscape.follow){landscape.camera.getWorldDirection(landscape.forward);landscape.yaw=Math.atan2(landscape.forward.x,-landscape.forward.z);landscape.pitch=Math.asin(landscape.forward.y);}}updateFollow();}
@@ -88,10 +112,10 @@ const counted=(n,one,many)=>`${n} ${n===1?one:many}`;
 function updatePartyRoster(){
   partyUI?.render(partyCount,duel.active);
   $('party-count').value=partyCount;
-  $('commission-start').innerHTML=`Jugar 1 vs ${partyCount} NPC <span>↗</span>`;
+  $('commission-start').innerHTML=flow?.preparing?'Guardar condiciones <span>→</span>':`Jugar 1 vs ${partyCount} NPC <span>↗</span>`;if(flow?.preparing)$('party-rules').disabled=true;
 }
 function updateCommissionMenu(){
-  updatePartyRoster();$('party-count').disabled=duel.active;
+  updatePartyRoster();if(flow?.preparing){$('commission-start').textContent='Guardar condiciones →';$('party-rules').disabled=true;}$('party-count').disabled=duel.active;
 
   $('match-record').textContent=`${counted(duelStats.wins,'victoria','victorias')} · ${counted(duelStats.losses,'derrota','derrotas')} · ${counted(duelStats.draws,'empate','empates')}`;
   $('commission-start').classList.toggle('hidden',duel.active);$('commission-resume').classList.toggle('hidden',!duel.active);$('commission-leave').classList.toggle('hidden',!duel.active);$('match-active-note').classList.toggle('hidden',!duel.active);$('npc-level').disabled=duel.active;
@@ -143,15 +167,15 @@ function updateUI(){
   const p=physics,wind=p.windKmh;
   $('online-footwork').classList.toggle('hidden',!online?.active||!duel.active||mode!=='flight');
   document.querySelector('.control-caption>span').textContent=online?.active?'W A S D · Pasos cortos para alinear el cruce':landscape.orbit.active?'Arrastra para orbitar · Rueda para acercar · V cambia la cámara':trail.visible?'Q / E para seguir la luz · V cámara orbital':'Arrastra para mirar · V cámara orbital · R para volver a lanzar';
-  $('intro-wind').textContent=Math.round(wind);const weather=$('intro-weather').querySelector('p');weather.innerHTML=physics.profile==='calm'?'Todo en calma<span>Hoy hace falta una brisa</span>':physics.profile==='gusts'?'Entre ráfagas<span>El viento cambia de intensidad</span>':physics.profile==='strong'?'Viento firme<span>Más fuerza en el hilo</span>':'Brisa de tarde<span>Buen momento para empezar</span>';
+  flow?.refresh();
   $('wind-value').textContent=wind.toFixed(1);$('wind-profile-label').textContent={breeze:'BRISA',gusts:'RÁFAGAS',strong:'FIRME',calm:'CALMA'}[p.profile];
   const strain=p.rope.broken>=0?0:Math.max(0,p.rope.stressRatio||p.tension/(p.rope.strength||90)),strainPercent=Math.round(strain*100);
-  $('height-value').textContent=Math.max(0,p.position.y).toFixed(1);$('line-value').textContent=p.lineLength.toFixed(1);$('tension-fill').style.width=clamp(strainPercent,0,100)+'%';
+  $('height-value').textContent=yardsValue(p.position.y);$('height-meters').textContent=`(${metersValue(p.position.y)} m)`;$('line-value').textContent=yardsValue(p.lineLength);$('line-meters').textContent=`(${metersValue(p.lineLength)} m)`;$('tension-fill').style.width=clamp(strainPercent,0,100)+'%';
   const tensionColor=strain>=.8?'#b94f37':strain>=.6?'#b78b3e':p.tension<.1?'#bb9450':'#5b826b';$('tension-fill').style.background=tensionColor;$('tension-label').style.color=tensionColor;$('tension-label').textContent=strain>=1?`AL LÍMITE · ${strainPercent}%`:strain>=.8?`Alta · ${strainPercent}%`:strain<.01?'Suelto':`${strainPercent}% del límite`;
   const secs=Math.floor(p.flightTime);$('flight-timer').textContent=String(Math.floor(secs/60)).padStart(2,'0')+':'+String(secs%60).padStart(2,'0');
   $('turns-value').textContent=p.turns;
   $('line-capacity').value=p.lineCapacity;$('line-capacity').disabled=duel.active||trail.visible||!!online?.active;
-  $('line-remaining').textContent=p.lineRemaining.toFixed(1);
+  $('line-remaining').innerHTML=distanceHTML(p.lineRemaining);
   $('energy-value').textContent=Math.round(p.energy)+'%';$('energy-fill').style.width=p.energy+'%';$('energy-fill').style.background=p.energy<20?'#bd744a':p.energy<45?'#b69c57':'#64866a';$('energy-meter').setAttribute('aria-valuenow',Math.round(p.energy));
   $('energy-state').textContent=p.exhausted?'Recupera hasta 20%':p.energy>99.5?'Listo para jugar':p.action==='hold'?'Recuperando':p.boost?'Esfuerzo alto':p.action==='reel'?'Esfuerzo suave':'Respirando';
   document.body.classList.toggle('dueling',duel.visible&&mode==='flight');document.body.classList.toggle('partying',duel.partyMode&&duel.visible);$('duel-mode-label').textContent=duel.partyMode?(duel.rules==='last-man'?'ÚLTIMO EN PIE':'PARTY'):'COMISIÓN';$('duel-hud').classList.toggle('hidden',!duel.visible||mode!=='flight');
@@ -170,7 +194,7 @@ function updateUI(){
   const pulseAge=p.time-p.lastTug,tugRecent=p.state==='flying'&&pulseAge<.65;
   $('tug-button').classList.toggle('pressed',p.state==='flying'&&pulseAge<.18);
   $('tug-progress').textContent=tugRecent?(p.tugSequence===2?`${p.tugIndex} / 2`:'TIRÓN'):(p.boost?'SHIFT + ESPACIO':'ESPACIO');
-  if(p.position.y>record+.1&&mode==='flight'&&p.state==='flying'){record=p.position.y;save();}$('record-value').textContent=record.toFixed(1);
+  if(p.position.y>record+.1&&mode==='flight'&&p.state==='flying'){record=p.position.y;save();}$('record-value').innerHTML=distanceHTML(record);
   $('flight-state-label').textContent={ready:'EN TIERRA',flying:'EN EL AIRE',cut:'CORTADO',grounded:'ATERRIZÓ'}[p.state];
   $('launch-button').classList.toggle('hidden',p.state==='flying'||trail.visible);$('launch-button').innerHTML=p.state==='grounded'?'Otra vez <span>↗</span>':'Lanzar <span>↗</span>';
   if(p.state==='ready'){
@@ -214,35 +238,36 @@ async function toggleAudio(){
 }
 
 function bindEvents(){
+  $('online-edit-settings').addEventListener('click',()=>{onlineSettingsReturn=true;openModal('online-settings-modal');});$('online-settings-done').addEventListener('click',closeModal);
+  for(const id of ['online-capacity','online-wind','online-strength'])$(id).addEventListener('change',()=>flow.refresh());
   $('pause-help').addEventListener('click',()=>openModal('help-modal'));
   $('pause-audio').addEventListener('click',toggleAudio);
   $('pause-assists').addEventListener('click',toggleAssist);
-  for(const id of ['intro-trail','flight-trail','pause-trail','trail-options'])$(id).addEventListener('click',()=>openModal('trail-modal'));
-  for(const id of ['trail-start','trail-retry'])$(id).addEventListener('click',startTrail);
-  for(const id of ['trail-leave','trail-free'])$(id).addEventListener('click',goFlying);
+  for(const id of ['flight-trail','pause-trail','trail-options'])$(id).addEventListener('click',()=>trail.visible?openModal('trail-modal'):beginPreparation('trail'));
+  $('trail-start').addEventListener('click',()=>beginPreparation('trail'));$('trail-retry').addEventListener('click',startTrail);
+  for(const id of ['trail-leave','trail-free'])$(id).addEventListener('click',()=>showFront('menu'));
   $('trail-resume').addEventListener('click',closeModal);$('camera-button').addEventListener('click',toggleCamera);
   $('orbit-near').addEventListener('click',()=>{landscape.orbit.zoom(-100);updateCamera();});$('orbit-far').addEventListener('click',()=>{landscape.orbit.zoom(100);updateCamera();});
   $('spectator-next').addEventListener('click',()=>{duel.spectatorView='battle';duel.spectateNext();landscape.follow=true;landscape.orbit.reset();updateUI();});
   $('spectator-all').addEventListener('click',()=>{duel.spectatorView='battle';duel.spectatorIndex=-1;landscape.orbit.active=false;landscape.follow=true;updateUI();});
-  $('spectator-exit').addEventListener('click',leaveCommission);
+  $('spectator-exit').addEventListener('click',()=>showFront('menu'));
   for(const [id,view]of[['spectator-kite','kite'],['spectator-onboard','onboard']])$(id).addEventListener('click',()=>{duel.spectatorView=view;landscape.orbit.active=false;landscape.follow=true;landscape.orbit.reset();updateFollow();updateUI();});
   $('result-watch').addEventListener('click',()=>{resultShown=true;closeModal();});$('spectator-result').addEventListener('click',()=>{if(online?.active){if(resultShown)openModal('result-modal');}else showCommissionResult();});
   for(const id of ['workshop-equipment','pause-equipment'])$(id).addEventListener('click',()=>openModal('equipment-modal'));$('equipment-done').addEventListener('click',closeModal);
   $('party-count').addEventListener('change',e=>{partyCount=clamp(Number(e.target.value),1,3);save();updatePartyRoster();});
-  $('intro-party').addEventListener('click',()=>openModal('commission-modal'));
+  $('pause-new-game').addEventListener('click',()=>showFront('modes'));
 
-  $('commission-open').addEventListener('click',()=>openModal('commission-modal'));$('pause-commission').addEventListener('click',()=>openModal('commission-modal'));$('duel-options').addEventListener('click',()=>openModal('commission-modal'));
-  $('commission-start').addEventListener('click',startCommission);$('commission-resume').addEventListener('click',closeModal);$('commission-leave').addEventListener('click',leaveCommission);$('rematch-button').addEventListener('click',startCommission);$('result-free').addEventListener('click',leaveCommission);
-  $('line-capacity').addEventListener('change',e=>{if(duel.active||trail.visible||!physics.setLineCapacity(Number(e.target.value))){e.target.value=physics.lineCapacity;toast('Recoge el hilo antes de elegir un carrete más pequeño.');return;}save();updateUI();toast(`Carrete de ${physics.lineCapacity} m preparado.`);});
-  $('start-button').addEventListener('click',goFlying);$('intro-workshop').addEventListener('click',()=>openModal('workshop'));
+  for(const id of ['commission-open','pause-commission'])$(id).addEventListener('click',()=>duel.visible?openModal('commission-modal'):beginPreparation('party'));$('duel-options').addEventListener('click',()=>openModal('commission-modal'));
+  $('commission-start').addEventListener('click',()=>flow?.preparing?closeModal():beginPreparation(partyUI.value.rules==='last-man'?'last-man':'party'));$('commission-resume').addEventListener('click',closeModal);$('commission-leave').addEventListener('click',()=>showFront('menu'));$('rematch-button').addEventListener('click',startCommission);$('result-free').addEventListener('click',()=>showFront('menu'));
+  $('line-capacity').addEventListener('change',e=>{if(duel.active||trail.visible||!physics.setLineCapacity(Number(e.target.value))){e.target.value=physics.lineCapacity;toast('Recoge el hilo antes de elegir un carrete más pequeño.');return;}save();updateUI();toast(`Carrete de ${distanceText(physics.lineCapacity)} preparado.`);});
   $('flight-workshop').addEventListener('click',()=>openModal('workshop'));$('pause-workshop').addEventListener('click',()=>openModal('workshop'));
   $('help-button').addEventListener('click',()=>openModal('help-modal'));$('help-done').addEventListener('click',closeModal);
   $('menu-button').addEventListener('click',()=>openModal('pause-modal'));$('home-button').addEventListener('click',e=>{e.preventDefault();openModal('pause-modal');});
   $('resume-button').addEventListener('click',closeModal);all('[data-close]').forEach(b=>b.addEventListener('click',closeModal));
-  $('workshop-done').addEventListener('click',()=>{closeModal();if(mode==='intro'){physics.reset();setMode('flight');}});
+  $('workshop-done').addEventListener('click',closeModal);
   $('wind-settings').addEventListener('click',()=>openModal('wind-modal'));$('pause-wind').addEventListener('click',()=>openModal('wind-modal'));$('wind-done').addEventListener('click',closeModal);
   $('restart-button').addEventListener('click',leaveCommission);
-  $('return-home').addEventListener('click',()=>{leaveCommission();setMode('intro');});
+  $('return-home').addEventListener('click',()=>showFront('menu'));
   $('launch-button').addEventListener('click',launch);$('tug-button').addEventListener('click',e=>tug(e.shiftKey||shiftDown||boostLatched));
   $('boost-button').addEventListener('click',()=>{if(modal||mode!=='flight')return;boostLatched=!boostLatched;updateControlState();});
   $('audio-button').addEventListener('click',toggleAudio);$('assist-toggle').addEventListener('click',toggleAssist);
@@ -258,6 +283,7 @@ function bindEvents(){
     const end=e=>{pointers.delete(e.pointerId);updateControlState();};button.addEventListener('pointerup',end);button.addEventListener('pointercancel',end);button.addEventListener('lostpointercapture',end);button.addEventListener('contextmenu',e=>e.preventDefault());
   }
   window.addEventListener('keydown',e=>{
+    if(!modal&&flow?.key(e))return;
     if(e.key==='Escape'){e.preventDefault();if(modal)closeModal();else if(compactUI?.cameraOpen)compactUI.setCameraTools(false);else openModal('pause-modal');return;}
     if(modal){if(modal==='equipment-modal'&&equipmentUI.key(e))return;if(e.key==='Tab'){const focusable=[...$(modal).querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled)')].filter(el=>el.offsetParent!==null);const first=focusable[0],last=focusable.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}return;}
     if(e.target.matches('input,textarea,select')||mode!=='flight')return;
@@ -267,8 +293,8 @@ function bindEvents(){
     if(e.repeat)return;
     if(e.code==='Space'){e.preventDefault();updateControlState();tug(shiftDown||boostLatched);}
     else if(key==='t')openModal('workshop');
-    else if(key==='n')openModal('commission-modal');
-    else if(key==='g')openModal('trail-modal');
+    else if(key==='n'){if(duel.visible)openModal('commission-modal');else beginPreparation('party');}
+    else if(key==='g'){if(trail.visible)openModal('trail-modal');else beginPreparation('trail');}
     else if(key==='v')toggleCamera();
     else if(key==='r'){if(trail.visible){openModal('trail-modal');return;}if(duel.visible){openModal('commission-modal');return;}releaseAll();physics.reset();landscape.follow=true;updateFollow();toast('De vuelta en tierra. Todo listo para otro intento.');}
     else if(key==='c'){$('follow-button').click();}
@@ -286,8 +312,9 @@ function bindEvents(){
 function frame(now){
   const dt=lastTime?Math.min((now-lastTime)/1000,.08):1/60;lastTime=now;
   if(online?.active)online.render(physics,duel);
-  if(!online?.active&&!modal&&!document.hidden){accumulator+=dt;const step=1/240;while(accumulator>=step){const wasSpectating=spectator().active;physics.step(step);duel.step(step);if(!wasSpectating&&spectator().active){releaseAll();landscape.follow=true;landscape.orbit.active=false;landscape.orbit.reset();}if(!duel.visible)solveRopeSystem([physics.rope],step);trail.step(step);accumulator-=step;}}
-  if(!online?.active&&duel.state==='finished'&&!duelRecorded){recordCommission();releaseAll();resultAt=physics.time;}
+  if(mode==='intro'&&!modal){physics.time+=dt;physics.windAt(physics.position,physics.wind);}
+  if(mode==='flight'&&!online?.active&&!modal&&!document.hidden){accumulator+=dt;const step=1/240;while(accumulator>=step){const wasSpectating=spectator().active;physics.step(step);duel.step(step);if(!wasSpectating&&spectator().active){releaseAll();landscape.follow=true;landscape.orbit.active=false;landscape.orbit.reset();}if(!duel.visible)solveRopeSystem([physics.rope],step);trail.step(step);accumulator-=step;}}
+  if(mode==='flight'&&!online?.active&&duel.state==='finished'&&!duelRecorded){recordCommission();releaseAll();resultAt=physics.time;}
   if(!online?.active&&duel.state==='finished'&&!resultShown&&!modal&&!spectator().active&&physics.time-resultAt>2.5)showCommissionResult();
   if(trail.state==='finished'&&!trailFinishedAt){trailFinishedAt=physics.time;releaseAll();if(trail.result.won&&(!trailBest||trail.elapsed<trailBest)){trailBest=trail.elapsed;trailNewBest=true;save();}}
   if(trail.state==='finished'&&!trailResultShown&&!modal&&physics.time-trailFinishedAt>.9)showTrailResult();
@@ -295,7 +322,7 @@ function frame(now){
   const marker=landscape.render(dt,mode,!!modal);
   const target=marker.trail,showTarget=mode==='flight'&&trail.active&&target?.visible;
   $('trail-marker').classList.toggle('hidden',!showTarget);$('trail-edge').classList.toggle('hidden',mode!=='flight'||!trail.active||!target||target.visible||!!modal);
-  if(target&&trail.active){const distance=physics.position.distanceTo(trail.target).toFixed(1);$('trail-target-name').textContent=`DESTELLO ${trail.index+1}`;$('trail-distance').textContent=distance+' m';if(showTarget){$('trail-marker').style.left=clamp(target.x,70,innerWidth-70)+'px';$('trail-marker').style.top=clamp(target.y-58,75,innerHeight-100)+'px';}else{let dx=target.x-innerWidth/2,dy=target.y-innerHeight/2;if(target.behind){dx=-dx;dy=-dy;}$('trail-edge').querySelector('b').style.transform=`rotate(${Math.atan2(dx,-dy)*180/Math.PI}deg)`;$('trail-edge').querySelector('span').textContent=`Destello ${trail.index+1} · ${distance} m${target.behind?' · detrás':''}`;}}if(duel.visible&&$('contact-detail').open)drawContact($('contact-view'),duel);
+  if(target&&trail.active){const distance=physics.position.distanceTo(trail.target);$('trail-target-name').textContent=`DESTELLO ${trail.index+1}`;$('trail-distance').innerHTML=distanceHTML(distance);if(showTarget){$('trail-marker').style.left=clamp(target.x,70,innerWidth-70)+'px';$('trail-marker').style.top=clamp(target.y-58,75,innerHeight-100)+'px';}else{let dx=target.x-innerWidth/2,dy=target.y-innerHeight/2;if(target.behind){dx=-dx;dy=-dy;}$('trail-edge').querySelector('b').style.transform=`rotate(${Math.atan2(dx,-dy)*180/Math.PI}deg)`;$('trail-edge').querySelector('span').textContent=`Destello ${trail.index+1} · ${distanceText(distance)}${target.behind?' · detrás':''}`;}}if(duel.visible&&$('contact-detail').open)drawContact($('contact-view'),duel);
   const show=mode==='flight'&&physics.state==='flying'&&assists&&marker.visible;
   $('kite-marker').classList.toggle('hidden',!show);
   if(show){$('kite-marker').style.left=marker.x+'px';$('kite-marker').style.top=(marker.y-Math.max(30,marker.size*.6+15))+'px';$('direction-arrow').style.transform=`rotate(${marker.angle}deg)`;}
@@ -326,12 +353,15 @@ try{
   partyUI=new PartySettings(saved.partyOptions||{profile:physics.profile,wind:physics.windSpeed},setup,save);
   compactUI=new CompactFlightUI({open:openModal,close:closeModal,release:releaseAll,currentModal:()=>modal});
   equipmentUI=new EquipmentUI(setup,()=>{physics.configure(setup);physics.reset();landscape.configure(setup);save();updateWorkshop();},!!landscape.renderer);
+  if(['normal','hard'].includes(saved.npcLevel))$('npc-level').value=saved.npcLevel;
+  for(const id of ['line-capacity','online-capacity'])populateCapacities($(id));
+  flow=new GameFlowUI({snapshot:preparationSnapshot,choose:chooseGameMode,edit:editPreparation,begin:beginPreparedGame,audio:toggleAudio,assists:toggleAssist,capacity:meters=>{if(flow.choice==='online')$('online-capacity').value=meters;else physics.setLineCapacity(meters);save();}});
   buildWorkshop();workshopDesign=new WorkshopDesign(setup,applySetup,toast);bindEvents();updateWorkshop();updateWindSettings();updateFollow();updateUI();
 
   online=new OnlineGame({
-    setup:()=>({...setup}),open:()=>openModal('online-modal'),close:closeModal,toast,
-    enter:()=>{stopTrail();duel.stop();releaseAll();},leave:leaveCommission,
-    ended:()=>{duel.stop();physics.networkControlled=false;duel.rival.networkControlled=false;physics.configure(setup);physics.anchor.set(0,1.35,0);physics.reset();setMode('intro');},
+    setup:()=>({...setup}),prepare:()=>beginPreparation('online'),open:()=>{if(mode==='intro'&&(!flow.preparing||flow.choice!=='online'))flow.select('online');openModal('online-modal');},close:closeModal,toast,
+    enter:()=>{stopTrail();duel.stop();releaseAll();},leave:()=>showFront('menu'),
+    ended:()=>{duel.stop();physics.networkControlled=false;duel.rival.networkControlled=false;physics.configure(setup);physics.anchor.set(0,1.35,0);physics.reset();setMode('intro');flow.show('menu');},
     round:data=>{
       closeModal();setMode('flight');resultShown=false;duelRecorded=true;zoom=false;landscape.zoom=false;
       duel.state=data.phase;physics.configure(data.match.pilots[data.slot].setup);landscape.configure(physics.setup);landscape.rivalKite?.configure(data.match.pilots[1-data.slot].setup);

@@ -196,3 +196,16 @@ El catálogo usa formas de las siete fotografías aportadas: frente perforado co
 Las numeraciones de algodón Nº 24, Nº 10 y Nº 4 se contrastaron con el catálogo del proveedor [Modista](https://www.modista.cl/collections/hilo-para-volantin-1); la referencia aportada de poliéster Nº 10 identifica ese material en su etiqueta. No existe una equivalencia universal de número comercial a diámetro. Los diámetros 0,35 / 0,50 / 0,65 mm y 0,45 mm de poliéster son aproximaciones explícitas de la simulación; pesos, esfuerzo y resistencia son calibraciones jugables, no certificados de carga de los productos fotografiados. La mecánica conserva el límite de 150 m y el cálculo de cortes por tensión y roce.
 
 El planteamiento de oscilación y vuelco de una lámina se apoya conceptualmente en [On the Motion of Falling Leaves](https://arxiv.org/abs/1007.1769); los coeficientes y el acoplamiento con este juego se desarrollaron y probaron aquí.
+
+
+## 1.12.0 · Flujo, primera persona y distancias
+
+`GameFlow` separa título, menú, modos, preparación y configuración del estado de simulación. La física local avanza solo en vuelo; los editores de preparación no lanzan ni inician una ronda. Los cinco modos convergen en una pantalla que resume el equipo y las condiciones; Rastro usa sus valores fijos y online abre la sala antes del inicio compartido.
+
+El carrete se dibuja sin mano en un segundo viewport WebGL, con cámara e iluminación propias, y en la misma zona del renderer Canvas. Su encuadre no depende del zoom de la cámara principal. El anclaje y las colisiones siguen usando las coordenadas físicas originales. El viewport se restaura al terminar de dibujarlo.
+
+`units.js` convierte 1 yd = 0,9144 m solo en la interfaz. Hilo, capacidad, reserva, altura, récord, distancia orbital y objetivos muestran yardas; sus equivalencias en metros usan texto menor. Tirantes y diámetro mantienen cm y mm por su escala.
+
+Al cortar se conserva posición y dirección, limitando la velocidad a 8 m/s. La hoja recoge el 65 % de la velocidad del aire en este modelo reducido, con variación lateral máxima de 4 m/s² y vertical acotada. No se modifica el reloj ni el paso físico. Se conservan sensibilidad a masa, picada inicial, aleteo y aterrizaje.
+
+El plano exterior tiene un hueco de 800 × 800 m: deja de superponerse con el terreno. Los últimos 40 m del borde llegan suavemente a altura cero. El plano cercano de cámara pasa de 0,05 a 0,15 m; camino y sombra usan desplazamiento de profundidad. Las pruebas lanzan rayos contra ambos suelos para comprobar una sola intersección por punto interior/exterior.

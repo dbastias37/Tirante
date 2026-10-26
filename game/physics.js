@@ -92,7 +92,7 @@ export class KitePhysics {
     this.right.crossVectors(this.nose,this.normal).normalize();
     this.orientation.setFromRotationMatrix(this._basis.makeBasis(this.right,this.nose,this.normal));
   }
-  cutLine(edge=this.rope.contactEdge,fraction=.5,reason='abrasion'){if(this.rope.broken<0){this.rope.cutReason=reason;this.rope.breakAt(clamp(Number.isFinite(edge)&&edge>=0?edge:18,0,this.rope.points.length-2),fraction);}if(this.state!=='cut'){this.freeTime=0;this.freePhase=this.heading;this.freeNoseY=this.nose.y;this.freeYaw=Math.atan2(this.nose.x,-this.nose.z);this.freeMode='glide';}this.sawing=false;this.state='cut';this.tension=0;this.pendingTug=0;this.setControls('hold',false);}
+  cutLine(edge=this.rope.contactEdge,fraction=.5,reason='abrasion'){if(this.rope.broken<0){this.rope.cutReason=reason;this.rope.breakAt(clamp(Number.isFinite(edge)&&edge>=0?edge:18,0,this.rope.points.length-2),fraction);}if(this.state!=='cut'){this.velocity.clampLength(0,8);this.freeTime=0;this.freePhase=this.heading;this.freeNoseY=this.nose.y;this.freeYaw=Math.atan2(this.nose.x,-this.nose.z);this.freeMode='glide';}this.sawing=false;this.state='cut';this.tension=0;this.pendingTug=0;this.setControls('hold',false);}
   step(dt) {
     this.time+=dt;this.tugCooldown=Math.max(0,this.tugCooldown-dt);this.maneuverHold=Math.max(0,this.maneuverHold-dt);this.windAt(this.position,this.wind);
     if(this.state==='cut'){stepFreeFlight(this,dt);this.rope.step(dt);return;}

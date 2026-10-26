@@ -1,3 +1,4 @@
+import {distanceText} from './units.js';
 import {guardRopeMotion} from './rope-system.js';
 import {Vector3} from './vendor/three.module.js';
 const $=id=>document.getElementById(id), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -12,7 +13,7 @@ export class OnlineGame{
     $('online-ready').onclick=()=>{this.queue.push({op:'ready',ready:!this.latest?.players[this.latest.slot]?.ready,setup:this.cb.setup()});this.wake();};
     $('online-copy').onclick=()=>this.copy();$('online-leave').onclick=()=>this.cb.leave();
     $('online-code-input').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();this.enter('join');}});
-    for(const id of ['intro-online','flight-online','pause-online'])$(id).onclick=()=>this.open();
+    for(const id of ['flight-online','pause-online'])$(id).onclick=()=>this.active?this.open():this.cb.prepare();
     $('online-return').onclick=()=>this.cb.close();
     const invited=location.hash.match(/sala=([A-Z2-9]{8})/i);if(invited)$('online-code-input').value=invited[1].toUpperCase();
     this.paint();if(this.session){this.cb.open();this.wake();}else if(invited)this.cb.open();
@@ -56,7 +57,7 @@ export class OnlineGame{
     const playing=['preparing','playing'].includes(d?.phase),left=d?.players.some(p=>p?.left);
     $('online-ready').disabled=!d||playing||left;$('online-ready').textContent=d?.players[d.slot]?.ready?'Cancelar listo':d?.phase==='finished'?'Listo para la revancha ↗':'Estoy listo ↗';
     $('online-return').classList.toggle('hidden',!playing);$('online-room-note').textContent=left?'Un jugador salió. Crea otra sala para un nuevo duelo.':d?.paused?'Esperando la reconexión. La física y el reloj están detenidos.':playing?'El duelo sigue mientras tengas el menú abierto.':'La partida comienza cuando ambos pulsen «Estoy listo».';
-    $('online-room-rules').textContent=d?`${d.settings.capacity} m de hilo · ${(d.settings.wind*3.6).toFixed(1)} km/h · 90 segundos`:'';
+    $('online-room-rules').textContent=d?`${distanceText(d.settings.capacity)} de hilo · ${(d.settings.wind*3.6).toFixed(1)} km/h · 90 segundos`:'';
   }
   render(p,duel,now=performance.now()){
     const d=this.latest;if(!d?.match)return;const m=d.match,own=d.slot,views=own?[duel.rival,p]:[p,duel.rival],fresh=this.visualSnapshot!==d;
