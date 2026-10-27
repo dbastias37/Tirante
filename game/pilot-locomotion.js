@@ -45,7 +45,9 @@ export class PilotLocomotion{
       const f=this.feet[i],leg=legs[i],offset=f.s>0?3:8;
       const travel=q[offset]*strideScale*b,lift=q[offset+1]*b;
       f.pitch=clamp(q[offset+2]*(-dir.z)*b,-.72,.90);
-      leg.shoe.rotation.set(f.pitch,f.s*.09+clamp(dir.x*.22,-.22,.22)*b,0);
+      // Forward is -Z. Positive yaw turns that foot toward -X, so the sign
+      // must be opposite the anatomical side to keep the toes pointing out.
+      leg.shoe.rotation.set(f.pitch,-f.s*.075-clamp(dir.x*.22,-.22,.22)*b,0);
       const rotation=leg.shoe.quaternion;
       // Ground the actual sole, not a point at the centre of the ankle.
       let low=Infinity;const points=leg.solePoints;

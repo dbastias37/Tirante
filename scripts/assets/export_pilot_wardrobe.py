@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import sys
+import subprocess
 from pathlib import Path
 import numpy as np
 from scipy.spatial import cKDTree
@@ -107,3 +108,4 @@ header='// Adapted from the user-supplied Shirt Template and Sneakers assets.\n/
 manifest={'sources':{n:hashlib.sha256((SOURCE/n).read_bytes()).hexdigest() for n in ['shirts_tpl.blend','sneakers.blend']},'triangles':{k:[len(g['indices'])//3 for g in levels] for k,levels in out.items()}}
 (ROOT/'game/assets/licenses/wardrobe-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 print(json.dumps(manifest,indent=2))
+subprocess.run([sys.executable,str(Path(__file__).with_name('rebake_shoe_colors.py')),str(SOURCE/'sneakers.blend')],check=True)

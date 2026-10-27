@@ -1,4 +1,4 @@
-import {Vector3,Color,Matrix3} from './vendor/three.module.js';
+import {Vector3,Color,Matrix3,DoubleSide,BackSide} from './vendor/three.module.js';
 import {rasterTriangle} from './software-raster.js';
 
 const sun=new Vector3(-.4,.7,-.5).normalize();
@@ -9,7 +9,7 @@ export function pilotFaces(model,camera,width,height){
   let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const m of model.parts){
     if(m===model.shadow)continue;
-    const g=m.geometry,p=g.attributes.position,index=g.index,n=g.attributes.normal,colors=g.attributes.color;normalMatrix.getNormalMatrix(m.matrixWorld);
+    const g=m.geometry,p=g.attributes.position,index=g.index,n=g.attributes.normal,colors=g.attributes.color,mirrored=m.matrixWorld.determinant()<0;normalMatrix.getNormalMatrix(m.matrixWorld);
     const cache=m.userData.canvasVertices||(m.userData.canvasVertices=Array.from({length:p.count},()=>({world:new Vector3(),screen:new Vector3(),rgb:[0,0,0]})));
     for(let i=0;i<p.count;i++){
       const q=cache[i];q.world.fromBufferAttribute(p,i).applyMatrix4(m.matrixWorld);q.screen.copy(q.world).project(camera);q.screen.x=(q.screen.x*.5+.5)*width;q.screen.y=(.5-q.screen.y*.5)*height;
@@ -19,6 +19,8 @@ export function pilotFaces(model,camera,width,height){
     }
     for(let i=0;i<index.count;i+=3){
       const points=[0,1,2].map(j=>cache[index.getX(i+j)]);if(points.some(q=>q.screen.z<-1||q.screen.z>1))continue;
+      const [a,b,c]=points.map(q=>q.screen),area=(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x),front=mirrored?area>0:area<0;
+      if(m.material.side!==DoubleSide&&(m.material.side===BackSide?front:!front))continue;
       for(const q of points){left=Math.min(left,q.screen.x);right=Math.max(right,q.screen.x);top=Math.min(top,q.screen.y);bottom=Math.max(bottom,q.screen.y);}
       result.push({points:points.map(q=>q.screen),rgb:points[0].rgb,colors:points.map(q=>q.rgb)});
     }

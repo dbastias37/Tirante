@@ -1,6 +1,6 @@
 # TIRANTE · El pulso del viento
 
-Simulador de volantines, versión 1.18.0, publicado desde este repositorio en Render.
+Simulador de volantines, versión 1.19.0, publicado desde este repositorio en Render.
 
 ## Instalación actual en Render
 
@@ -22,6 +22,15 @@ La instalación actual usa el plan gratuito, una instancia y `DATA_DIR=/tmp/tira
 - Party local contra 1–3 NPC, Rastro de luz contrarreloj y duelo online para dos personas.
 - Interfaz compacta para móvil, renderer WebGL y alternativa Canvas.
 - Servidor Node.js, base SQLite, almacenamiento de estampados y pruebas automatizadas.
+
+## Cambios de la versión 1.19.0
+
+- Brazos continuos y cerrados en codos y muñecas; cuello unido al torso y a la cabeza inclinada, cuerpo interior bajo las prendas y puños de tobillo bajo las zapatillas.
+- Forro interior y espesor en poleras, polerón y capucha. Los bordes están cosidos geométricamente y el interior comparte los pesos de la tela exterior.
+- Zapatillas orientadas hacia delante con apertura natural: corregido el signo del giro en reposo y al caminar lateralmente. Colores de la textura original recalculados por cara para conservar las discontinuidades de UV, sin mezclarlas en las costuras.
+- Mango de NPC sobresaliente solo por el lado de agarre; el otro extremo termina al ras. La muñeca queda unida al antebrazo durante el manejo.
+- Normales de tela recalculadas después de la deformación. Canvas descarta las caras traseras igual que WebGL, para detectar los huecos también en la revisión sin GPU.
+- [Pruebas y límites de la revisión](docs/validation-1.19.md). Los futuros archivos de rostro y brazos todavía no están incorporados.
 
 ## Cambios de la versión 1.18.0
 

@@ -24,6 +24,11 @@ for(const [dx,dz] of [[0,-1],[0,1],[1,0],[-1,0],[.707,-.707]]){
  const pose=m.trousers.mesh.geometry.attributes.position.array.slice(),shoes=m.legs.map(l=>l.shoe.position.toArray());m.update(p,6);assert.deepEqual(m.trousers.mesh.geometry.attributes.position.array,pose);assert.deepEqual(m.legs.map(l=>l.shoe.position.toArray()),shoes,'Pause freezes feet and clothing');
  p.anchor.x+=30;p.position.x+=30;m.update(p,6.0167);assert.equal(m.locomotion.blend,0,'Respawn/teleport resets planted contacts');
 }
+for(const side of [-1,1]){
+ const p=new KitePhysics(),m=new PilotModel();p.launch();p.position.set(0,20,-25);m.update(p,0);
+ for(let n=1;n<=60;n++){p.anchor.x+=side*.65/60;p.position.set(p.anchor.x,20,-25);m.update(p,n/60);}
+ for(const leg of m.legs){const toe=new Vector3(0,0,-1).applyQuaternion(leg.shoe.quaternion);assert.ok(toe.z<-.8&&toe.x*side>0,'Side steps orient both feet toward travel instead of the opposite side');}
+}
 assert.ok(totalLocks>500);
 // Phase follows distance, not refresh rate.
 const phases=[];for(const fps of [30,60,120]){
