@@ -1,4 +1,5 @@
 import * as T from './vendor/three.module.js';
+import {finishFabric} from './pilot-fabric.js';
 import {PILOT_WARDROBE} from './pilot-wardrobe-data.js';
 
 const smooth=(a,b,x)=>{const t=T.MathUtils.clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
@@ -23,8 +24,8 @@ export function wardrobeGeometry(source,mirror=1){
 export class FittedGarment{
   constructor(kind,material){
     this.kind=kind;this.level=0;
-    this.levels=PILOT_WARDROBE[kind].map(source=>{
-      const geometry=wardrobeGeometry(source),rest=geometry.attributes.position.array.slice(),normals=geometry.attributes.normal.array.slice(),weights=new Float32Array(rest.length/3*3),bones=new Uint8Array(rest.length/3*3);
+    this.levels=PILOT_WARDROBE[kind].map((source,level)=>{
+      const geometry=finishFabric(wardrobeGeometry(source),kind,level),rest=geometry.attributes.position.array.slice(),normals=geometry.attributes.normal.array.slice(),weights=new Float32Array(rest.length/3*3),bones=new Uint8Array(rest.length/3*3);
       for(let i=0;i<rest.length;i+=3){
         const x=Math.abs(rest[i]),y=rest[i+1],arm=y>1.53?0:smooth(.12,.235,x)*smooth(1.20,1.37,y),fore=smooth(.435,.532,x),side=rest[i]<0?1:3;
         weights[i]=1-arm;weights[i+1]=arm*(1-fore);weights[i+2]=arm*fore;bones[i]=0;bones[i+1]=side;bones[i+2]=side+1;

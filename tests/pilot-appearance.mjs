@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import {PilotModel} from '../game/pilot-model.js';
+import {KitePhysics} from '../game/physics.js';
+import {Vector3,Box3} from '../game/vendor/three.module.js';
+
+const V=(x=0,y=0,z=0)=>new Vector3(x,y,z);
+const triangleNormal=(g,offset)=>{
+  const a=V().fromBufferAttribute(g.attributes.position,g.index.getX(offset));
+  const b=V().fromBufferAttribute(g.attributes.position,g.index.getX(offset+1));
+  const c=V().fromBufferAttribute(g.attributes.position,g.index.getX(offset+2));
+  return b.sub(a).cross(c.sub(a)).normalize();
+};
+let poses=0;
+for(let index=0;index<3;index++){
+  const p=new KitePhysics(),m=new PilotModel(index);p.launch();p.position.set(0,12,-25);m.update(p,0);
+  const support=m.arms[1],guide=m.arms[0],hold=support.palm.position.clone();
+  for(const level of [0,1]){
+    m.setDetail(level);m.update(p,.1);
+    // Face ribbons used to have reversed winding, invisible with GPU culling.
+    const features=m.features.geometry;
+    for(let i=0;i<features.index.count;i+=3)assert.ok(triangleNormal(features,i).z<0,'Eyes, brows and lips face outwards');
+    assert.ok(features.attributes.color.count===features.attributes.position.count);
+    for(const hand of m.arms.map(a=>a.hand))for(const curl of [0,1]){
+      hand.curl=null;hand.pose(curl);
+      const g=hand.mesh.geometry;
+      // The end of every digit must be closed and face away from the finger.
+      for(const r of hand.levels[level].rings){
+        const tip=V().fromBufferAttribute(g.attributes.position,r.capIndex),previous=V();
+        const {sides,steps}=hand.levels[level];
+        for(let j=0;j<sides;j++)previous.add(V().fromBufferAttribute(g.attributes.position,r.start+(steps-1)*sides+j));
+        const direction=tip.clone().sub(previous.divideScalar(sides)).normalize();
+        for(let i=0;i<g.index.count;i+=3)if(g.index.getX(i)===r.capIndex)assert.ok(triangleNormal(g,i).dot(direction)>.85,'Fingertips stay outward-facing when bent');
+      }
+    }
+    support.hand.curl=null;guide.hand.curl=null;
+    for(const action of ['hold','release','reel'])for(let step=0;step<12;step++){
+      const time=1+poses*.02;p.action=action;p.lastTug=time-.12;p.rope.stressRatio=step/12;m.update(p,time);poses++;
+      assert.ok(support.palm.position.distanceTo(hold)<1e-10,'The supporting hand stays on the fixed axle while the spool turns');
+      assert.ok(m.outlet.getWorldPosition(V()).distanceTo(p.anchor)<1e-8,'Appearance changes cannot move the physical line anchor');
+      for(const part of m.parts){
+        const g=part.geometry,position=g.attributes.position,normal=g.attributes.normal,color=g.attributes.color;
+        assert.equal(normal.count,position.count,'Added cloth details also receive normals');
+        if(color)assert.equal(color.count,position.count,'Every added vertex has a colour');
+        for(const a of [position,normal,color].filter(Boolean))assert.ok(a.array.every(Number.isFinite),'Animated appearance has finite buffers');
+      }
+    }
+    const hand=support.hand.mesh,box=new Box3().setFromBufferAttribute(hand.geometry.attributes.position);box.applyMatrix4(hand.matrix).applyMatrix4(support.palm.matrix);
+    assert.ok(box.min.y<1.21&&box.max.y>1.21&&box.min.z<-.40&&box.max.z>-.40,'The support hand surrounds the axle instead of floating beside it');
+    const fingers=support.hand.mesh.geometry.attributes.position.array.slice();m.update(p,m.lastTime);assert.deepEqual(support.hand.mesh.geometry.attributes.position.array,fingers,'Paused fingers do not advance');
+    p.eliminated=true;m.update(p,m.lastTime+.1);assert.ok(guide.palm.position.y<1.1);assert.ok(support.palm.position.distanceTo(hold)<1e-10);p.eliminated=false;
+  }
+}
+console.log(`PASS: facial front faces, five closed articulated digits, fixed axle grip, paused fingers, finite matched cloth/face buffers and exact line anchor in ${poses} animated poses.`);

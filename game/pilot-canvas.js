@@ -30,11 +30,11 @@ export function rasterPilot(view,target){
   const w=view.right-view.left+4,h=view.bottom-view.top+4;
   for(const f of view.faces){const q=f.points.map(p=>({x:(p.x-view.left+2)/w*target.width,y:(p.y-view.top+2)/h*target.height,z:p.z}));rasterTriangle(target,q[0],q[1],q[2],f.colors[0],f.colors[1],f.colors[2]);}
 }
-export const pilotRasterHeight=view=>view.bottom-view.top>192?288:view.bottom-view.top>96?192:96;
+export const pilotRasterHeight=view=>view.bottom-view.top>320?432:view.bottom-view.top>192?288:view.bottom-view.top>96?192:96;
 export class PilotCanvas{
   constructor(){
-    // Three reusable sizes: a distant 60 px pilot does not need a 288 px buffer.
-    this.buffers=new Map([96,192,288].map(height=>{
+    // Reusable sizes: a distant 60 px pilot does not need a 288 px buffer.
+    this.buffers=new Map([96,192,288,432].map(height=>{
       const width=height*2/3,canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
       const ctx=canvas.getContext('2d'),image=ctx.createImageData(width,height);
       return [height,{canvas,ctx,image,target:{width,height,data:image.data,depth:new Float32Array(width*height)}}];

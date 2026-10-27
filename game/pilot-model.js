@@ -1,5 +1,7 @@
 import * as T from './vendor/three.module.js';
 import {PilotLocomotion,PilotTrousers,legRotation} from './pilot-locomotion.js';
+import {PilotHand} from './pilot-hands.js';
+import {faceLevel} from './pilot-appearance.js';
 import {PILOT_HEADS} from './pilot-heads.js';
 import {FittedGarment,wardrobeGeometry,PILOT_WARDROBE} from './pilot-wardrobe.js';
 
@@ -36,27 +38,22 @@ function elbow(a,b,pole,upper=.30,lower=.27){
   const along=(upper*upper-lower*lower+distance*distance)/(2*distance);
   return a.clone().addScaledVector(d,along).addScaledVector(side,Math.sqrt(Math.max(0,upper*upper-along*along)));
 }
-function hand(parent,skin){
-  const g=new T.Group();parent.add(g);
-  ball(g,skin,V(),V(.043,.023,.064));
-  for(let i=0;i<4;i++){
-    const x=(i-1.5)*.019,length=[.056,.065,.062,.05][i];
-    const finger=add(g,rings([[0,.008,.008],[.45,.009,.009],[1,.0065,.0065]],7),skin);
-    segment(finger,V(x,0,-.037),V(x,-.026,-.037-length*.7));
-    const tip=add(g,rings([[0,.007,.007],[1,.005,.005]],7),skin);segment(tip,V(x,-.026,-.037-length*.7),V(x,-.048,-.055));
-  }
-  const thumb=add(g,rings([[0,.011,.01],[1,.008,.008]],8),skin);segment(thumb,V(.036,0,.012),V(.055,-.028,-.025));bake(g);return g;
-}
 function reel(parent,wood,thread,trim){
-  const rig=new T.Group();parent.add(rig);rig.position.set(0,1.235,-.40);
+  const rig=new T.Group();parent.add(rig);rig.position.set(0,1.21,-.40);
   const spin=new T.Group();rig.add(spin);
-  const core=add(spin,new T.CylinderGeometry(.082,.082,.18,20),thread);core.rotation.z=Math.PI/2;
-  for(const x of [-.10,.10]){
-    const rim=add(spin,new T.TorusGeometry(.106,.010,5,24),wood,V(x,0,0));rim.rotation.y=Math.PI/2;
-    for(let i=0;i<6;i++){const a=i/6*Math.PI*2,spoke=add(spin,new T.BoxGeometry(.012,.018,.095),wood,V(x,Math.sin(a)*.052,Math.cos(a)*.052));spoke.rotation.x=-a;}
-    const hub=add(spin,new T.CylinderGeometry(.023,.023,.025,12),trim,V(x,0,0));hub.rotation.z=Math.PI/2;
+  const core=add(spin,new T.CylinderGeometry(.118,.118,.145,24),thread);core.rotation.z=Math.PI/2;
+  for(const x of [-.085,.085]){
+    const shape=new T.Shape();shape.absarc(0,0,.138,0,Math.PI*2,false);
+    const axle=new T.Path();axle.absarc(0,0,.027,0,Math.PI*2,true);shape.holes.push(axle);
+    for(let i=0;i<6;i++){const a=i/6*Math.PI*2,hole=new T.Path();hole.absarc(Math.cos(a)*.077,Math.sin(a)*.077,.027,0,Math.PI*2,true);shape.holes.push(hole);}
+    const disk=new T.ExtrudeGeometry(shape,{depth:.012,bevelEnabled:false,steps:1,curveSegments:5});if(!disk.index)disk.setIndex(Array.from({length:disk.attributes.position.count},(_,i)=>i));
+    const side=add(spin,disk,wood,V(x-.006,0,0));side.rotation.y=Math.PI/2;
+    const rim=add(spin,new T.TorusGeometry(.138,.006,5,28),wood,V(x,0,0));rim.rotation.y=Math.PI/2;
   }
-  bake(spin);return {rig,spin};
+  bake(spin);
+  // The reel turns around a fixed axle, while the supporting hand stays on it.
+  const handle=add(rig,new T.CylinderGeometry(.016,.019,.42,12),wood);handle.rotation.z=Math.PI/2;
+  return {rig,spin};
 }
 
 function contactShadow(parent){
@@ -79,13 +76,11 @@ export class PilotModel{
     this.garment=new FittedGarment(index%3===2?'hoodie':'tee',this.top);this.group.add(this.garment.mesh);this.torso=this.garment.mesh;
     this.neck=add(this.body,new T.CylinderGeometry(.046,.057,.10,12),this.skin,V(0,.54,0));
     this.head=new T.Group();this.head.position.set(0,.57,0);this.body.add(this.head);
-    this.headLevels=[PILOT_HEADS[female?1:0],PILOT_WARDROBE.distantHeads[female?1:0]].map(source=>{
-      const geometry=wardrobeGeometry(source),hairFaces=[];
-      for(let i=0;i<source.indices.length;i+=3){let y=0,z=0;for(let j=0;j<3;j++){const n=source.indices[i+j]*3;y+=source.vertices[n+1]/3;z+=source.vertices[n+2]/3;}if(y>.17||(z>.023&&y>.10))hairFaces.push(...source.indices.slice(i,i+3));}
-      const hair=geometry.clone();hair.setIndex(hairFaces);return {geometry,hair};
-    });
-    this.face=add(this.head,this.headLevels[0].geometry,this.skin);
-    this.hairMesh=add(this.head,this.headLevels[0].hair,this.hair,V(0,.001,.001),V(1.025,1.01,1.025));this.hairMesh.name='hair';
+    this.faceSkin=this.skin.clone();this.faceSkin.vertexColors=true;this.hair.vertexColors=true;
+    this.headLevels=[PILOT_HEADS[female?1:0],PILOT_WARDROBE.distantHeads[female?1:0]].map((source,level)=>faceLevel(source,index,level===1));
+    this.face=add(this.head,this.headLevels[0].geometry,this.faceSkin);
+    const detailMaterial=material(0xffffff);detailMaterial.vertexColors=true;this.features=add(this.head,this.headLevels[0].features,detailMaterial);this.features.name='facial-features';
+    this.hairMesh=add(this.head,this.headLevels[0].hair,this.hair);this.hairMesh.name='hair';
     if(female)ball(this.head,this.hair,V(0,.14,.105),V(.043,.075,.04));
     this.locomotion=new PilotLocomotion();this.trousers=new PilotTrousers(this.pants);this.hips=this.trousers.mesh;this.group.add(this.hips);
     this.arms=[];this.legs=[];
@@ -93,7 +88,7 @@ export class PilotModel{
       const upper=add(this.group,rings([[.22,.056,.056],[.35,.057,.055],[.72,.048,.046],[1,.041,.042]],12),this.skin);
       const lower=add(this.group,rings([[0,.042,.043],[.22,.050,.045],[.70,.034,.033],[.87,.030,.029],[1,.029,.027]],12),this.skin);
       const cuff=new T.Object3D();this.group.add(cuff);upper.visible=lower.visible=this.garment.kind==='tee';
-      const palm=hand(this.group,this.skin);this.arms.push({s,upper,lower,cuff,palm});
+      const hand=new PilotHand(s,this.skin),palm=hand.group;this.group.add(palm);this.arms.push({s,upper,lower,cuff,palm,hand});
       const thigh=new T.Object3D(),shin=new T.Object3D();this.group.add(thigh,shin);
       const shoeGroup=new T.Group();this.group.add(shoeGroup);
       const shoeLevels=PILOT_WARDROBE.sneaker.map(source=>wardrobeGeometry(source,s));
@@ -109,8 +104,9 @@ export class PilotModel{
   configure(tint){if(this.tint===tint)return;this.tint=tint;this.top.color.set(tint);this.dark.color.set(tint).multiplyScalar(.40);}
   setDetail(level){
     if(this.detail===level)return;this.detail=level;this.garment.setDetail(level);
-    this.face.geometry=this.headLevels[level].geometry;this.hairMesh.geometry=this.headLevels[level].hair;
+    this.face.geometry=this.headLevels[level].geometry;this.hairMesh.geometry=this.headLevels[level].hair;this.features.geometry=this.headLevels[level].features;
     for(const leg of this.legs)leg.sneaker.geometry=leg.shoeLevels[level];
+    for(const arm of this.arms)arm.hand.setDetail(level);
     for(const part of this.parts)part.userData.canvasVertices=null;
   }
   update(p,time,camera=null){
@@ -133,10 +129,13 @@ export class PilotModel{
     const reelRate=inactive||p.action==='hold'?0:(p.action==='reel'?1:-1)*(p.boost?8:4);this.spool.rotation.x+=dt*reelRate;
     for(const arm of this.arms){
       const s=arm.s,a=V(s*.185,.465,0).applyMatrix4(this.body.matrix),working=p.action!=='hold'&&!inactive;
-      const b=s<0?V(-.148,1.235,-.40):inactive?V(.22,1.01,-.13):V(.137,1.27+(working?Math.sin(this.spool.rotation.x)*.035:0)+tug*.045,-.40+(working?Math.cos(this.spool.rotation.x)*.035:0)+tug*.035);
+      const b=s>0?V(.16,1.24,-.325):inactive?V(-.22,1.01,-.13):V(p.action==='release'?-.14:-.12,1.13+(working?Math.sin(this.spool.rotation.x)*.012:0)+tug*.02,-.405+(working?Math.cos(this.spool.rotation.x)*.012:0)+tug*.015);
       const e=elbow(a,b,V(s*.6,.95,.02));segment(arm.upper,a,e);segment(arm.lower,e,b);
       const wrist=b.clone().lerp(e,.12);segment(arm.cuff,wrist,b);
-      arm.palm.position.copy(b);arm.palm.rotation.set(-.3,s<0?.9:-.9,s<0?-.7:.7);
+      arm.palm.position.copy(b);
+      if(s<0&&!inactive)arm.palm.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(V(0,0,1),V(-1,0,0),V(0,-1,0)));
+      else arm.palm.rotation.set(s<0?-.45:0,0,s<0?-.12:0);
+      arm.hand.pose(s>0?.95:inactive?.15:p.action==='release'?.12:p.action==='reel'?.40:.20,dt);
     }
     for(let i=0;i<this.legs.length;i++){
       const leg=this.legs[i],foot=gait.feet[i],knee=elbow(foot.hip,foot.ankle,foot.knee,.43,.43);
