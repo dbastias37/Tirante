@@ -14,8 +14,8 @@ La conservación de volumen sigue el principio documentado para [Preserve Volume
 
 ## Validación
 
-- `npm run build`: comprobación de sintaxis de todos los módulos.
-- `npm test`: suite completa de vuelo, hilo, estabilidad, Party, vidas, online, cámaras, personalización y servidor, además de los casos de personajes.
+- `npm run build`: aprobado; 92 módulos comprobados.
+- `npm test`: aprobado; suite completa de vuelo, hilo, estabilidad, Party, vidas, online, cámaras, personalización y servidor, además de los casos de personajes.
 - 216 poses de apariencia: muñecas a menos de 38° de la dirección del antebrazo, agarre fijo, dedos articulados, pausa, UV y buffers finitos.
 - 54 poses de solidez: rayos alrededor de codos, muñecas y unión cabeza/cuello, cierre de garganta visto desde abajo, torso cubierto por la ropa y forro cerrado en ambos niveles de detalle.
 - 72 combinaciones de ropa y detalle: ajuste de cintura/mangas, puntera interior en el lado correcto de cada pie y profundidad de Canvas.
@@ -34,3 +34,19 @@ La conservación de volumen sigue el principio documentado para [Preserve Volume
 Los pliegues son deformaciones dirigidas por la postura, no una simulación física de tela. Los rostros conservan el detalle de los recursos recibidos, sin animación facial. No se alteran reglas de combate, controles ni físicas de vuelo. La inspección de navegador usa Canvas cuando WebGL no está disponible; no equivale a medir rendimiento o apariencia en una GPU real.
 
 Solo se publican recursos adaptados al juego, código y verificaciones. Los archivos originales y las capturas privadas de referencia quedan fuera del repositorio. La procedencia y la información disponible sobre licencias permanecen en Créditos y `game/assets/licenses/`.
+
+## Comprobación en producción · 27 de octubre de 2026
+
+- Código publicado: `8f5a7d45709d259c087fc38156558a1b8d1a778f`.
+- Render: `dep-dbgdgu6q1p3s739vivhg`, estado `live` a las 17:00:08 UTC.
+- `/healthz`: HTTP 200, versión `1.21.0`. Los cinco módulos principales modificados y los dos atlas cambiados coinciden byte a byte con los archivos probados.
+- Flujo título → nueva partida → Party → preparación → comienzo; alternancia entre Mateo, Alma y Nico, acercamiento y órbita. Probados soltar, recoger y tirón; tras tocar tierra apareció el espectador y se produjo el nuevo lanzamiento con una vida menos. El menú muestra `VERSIÓN 1.21.0`.
+- Sin excepciones nuevas de lógica en el navegador. El entorno carece de contexto WebGL y activó la alternativa Canvas prevista. No se presenta como una comprobación de FPS o de GPU.
+
+Capturas de la web con los recursos nuevos:
+
+![Mateo: manos, ropa y par de zapatillas](tirante-1-21-mateo.jpg)
+
+![Alma: mentón, unión del cuello y agarre](tirante-1-21-alma.jpg)
+
+![Nico: manga, capucha, mandíbula y mano guía](tirante-1-21-nico.jpg)
