@@ -1,6 +1,6 @@
 # TIRANTE · El pulso del viento
 
-Simulador de volantines, versión 1.19.0, publicado desde este repositorio en Render.
+Simulador de volantines, versión 1.20.0, publicado desde este repositorio en Render.
 
 ## Instalación actual en Render
 
@@ -23,6 +23,15 @@ La instalación actual usa el plan gratuito, una instancia y `DATA_DIR=/tmp/tira
 - Interfaz compacta para móvil, renderer WebGL y alternativa Canvas.
 - Servidor Node.js, base SQLite, almacenamiento de estampados y pruebas automatizadas.
 
+## Cambios de la versión 1.20.0
+
+- Rostros, ojos, pelo y zapatillas deportivas adaptados del kit de personajes aportado. Texturas UV recortadas en atlas pequeños, con islas separadas para evitar manchas al reducir las mallas.
+- Manos continuas y pesos de dedos de HandSwap: agarre del eje fijo, mano guía y postura relajada; cierre del corte de muñeca. Se usa la piel del juego porque el archivo no incluye su textura original.
+- Mateo lleva el suéter del kit; Alma conserva la polera y Nico el polerón. Mangas adaptadas a los hombros y al carrete, con forro, puños y piel interior ajustados a la postura.
+- Se conservan la caminata, los apoyos de pies, el mango de un solo lado y el anclaje exacto del hilo. Los recursos sustituyen las piezas de los NPC dentro de las partidas.
+- Dos niveles de detalle, 12.927–16.015 triángulos cerca y 6.229–6.730 lejos; 17 grupos de dibujo por NPC. Los atlas se comparten entre instancias y Canvas usa los mismos UV, profundidad y recortes de transparencia.
+- [Pruebas, decisiones de adaptación y límites](docs/validation-1.20.md). Procedencia y estado de las licencias registrados en Créditos y en `game/assets/licenses/`.
+
 ## Cambios de la versión 1.19.0
 
 - Brazos continuos y cerrados en codos y muñecas; cuello unido al torso y a la cabeza inclinada, cuerpo interior bajo las prendas y puños de tobillo bajo las zapatillas.
@@ -30,7 +39,7 @@ La instalación actual usa el plan gratuito, una instancia y `DATA_DIR=/tmp/tira
 - Zapatillas orientadas hacia delante con apertura natural: corregido el signo del giro en reposo y al caminar lateralmente. Colores de la textura original recalculados por cara para conservar las discontinuidades de UV, sin mezclarlas en las costuras.
 - Mango de NPC sobresaliente solo por el lado de agarre; el otro extremo termina al ras. La muñeca queda unida al antebrazo durante el manejo.
 - Normales de tela recalculadas después de la deformación. Canvas descarta las caras traseras igual que WebGL, para detectar los huecos también en la revisión sin GPU.
-- [Pruebas y límites de la revisión](docs/validation-1.19.md). Los futuros archivos de rostro y brazos todavía no están incorporados.
+- [Pruebas y límites de la revisión](docs/validation-1.19.md). Los archivos de rostro y brazos se incorporan en la versión 1.20.
 
 ## Cambios de la versión 1.18.0
 

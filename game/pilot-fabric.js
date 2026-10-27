@@ -9,6 +9,7 @@ export function finishFabric(g,kind,level){
   for(let i=0;i<p.count;i++){
     let x=p.getX(i),y=p.getY(i),z=p.getZ(i);const arm=smooth(.16,.25,Math.abs(x))*(1-smooth(1.48,1.53,y));
     y+=(y-1.425)*arm*(kind==='tee'?.19:.06);z+=(z+.015)*arm*(kind==='tee'?.22:.07);
+    if(kind==='hoodie'){const cuff=smooth(.60,.745,Math.abs(x));y=1.425+(y-1.425)*(1-.32*cuff);z=-.015+(z+.015)*(1-.32*cuff);}
     const lower=(1-smooth(1.16,1.34,y))*smooth(.95,1.02,y)*(1-smooth(.12,.20,Math.abs(x)));
     const fold=Math.sin(y*59+x*33)*.0033+Math.sin(y*97-x*19)*.0014;
     z+=Math.sign(z||1)*fold*lower;p.setXYZ(i,x,y,z);
@@ -34,7 +35,7 @@ export function finishFabric(g,kind,level){
   if(kind==='tee'){
     const pocket=[[.047,1.337],[.112,1.337],[.112,1.270],[.080,1.254],[.047,1.270],[.047,1.337]];
     stroke(pocket,.0014,.69);stroke([[.047,1.335],[.112,1.335]],.004,.84,.0035);
-  }else{
+  }else if(kind==='hoodie'){
     const pocket=[[-.105,1.073],[-.075,1.151],[.075,1.151],[.105,1.073],[.092,1.033],[-.092,1.033],[-.105,1.073]];
     stroke(pocket,.0022,.67);stroke([[-.105,1.073],[-.075,1.151]],.006,.58,.004);stroke([[.075,1.151],[.105,1.073]],.006,.58,.004);
     for(const s of [-1,1])stroke([[s*.027,1.465],[s*.031,1.412],[s*.024,1.365]],.0032,.45,.005);

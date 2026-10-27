@@ -9,10 +9,11 @@ export function pilotFaces(model,camera,width,height){
   let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const m of model.parts){
     if(m===model.shadow)continue;
-    const g=m.geometry,p=g.attributes.position,index=g.index,n=g.attributes.normal,colors=g.attributes.color,mirrored=m.matrixWorld.determinant()<0;normalMatrix.getNormalMatrix(m.matrixWorld);
+    const g=m.geometry,p=g.attributes.position,index=g.index,n=g.attributes.normal,colors=g.attributes.color,uv=g.attributes.uv,texture=uv?m.material.userData.pixels:null,mirrored=m.matrixWorld.determinant()<0;normalMatrix.getNormalMatrix(m.matrixWorld);
     const cache=m.userData.canvasVertices||(m.userData.canvasVertices=Array.from({length:p.count},()=>({world:new Vector3(),screen:new Vector3(),rgb:[0,0,0]})));
     for(let i=0;i<p.count;i++){
       const q=cache[i];q.world.fromBufferAttribute(p,i).applyMatrix4(m.matrixWorld);q.screen.copy(q.world).project(camera);q.screen.x=(q.screen.x*.5+.5)*width;q.screen.y=(.5-q.screen.y*.5)*height;
+      if(texture){const e=camera.matrixWorldInverse.elements;q.screen.u=uv.getX(i);q.screen.v=uv.getY(i);q.screen.w=-1/(e[2]*q.world.x+e[6]*q.world.y+e[10]*q.world.z+e[14]);}
       normal.fromBufferAttribute(n,i).applyMatrix3(normalMatrix).normalize();const shade=.60+.40*Math.max(0,normal.dot(sun));
       color.copy(m.material.color);if(colors&&m.material.vertexColors){color.r*=colors.getX(i);color.g*=colors.getY(i);color.b*=colors.getZ(i);}color.multiplyScalar(shade).convertLinearToSRGB();
       q.rgb[0]=color.r*255;q.rgb[1]=color.g*255;q.rgb[2]=color.b*255;
@@ -22,7 +23,7 @@ export function pilotFaces(model,camera,width,height){
       const [a,b,c]=points.map(q=>q.screen),area=(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x),front=mirrored?area>0:area<0;
       if(m.material.side!==DoubleSide&&(m.material.side===BackSide?front:!front))continue;
       for(const q of points){left=Math.min(left,q.screen.x);right=Math.max(right,q.screen.x);top=Math.min(top,q.screen.y);bottom=Math.max(bottom,q.screen.y);}
-      result.push({points:points.map(q=>q.screen),rgb:points[0].rgb,colors:points.map(q=>q.rgb)});
+      result.push({points:points.map(q=>q.screen),rgb:points[0].rgb,colors:points.map(q=>q.rgb),texture});
     }
   }
   return {faces:result,left,top,right,bottom};
@@ -30,7 +31,7 @@ export function pilotFaces(model,camera,width,height){
 export function rasterPilot(view,target){
   target.data.fill(0);target.depth.fill(Infinity);
   const w=view.right-view.left+4,h=view.bottom-view.top+4;
-  for(const f of view.faces){const q=f.points.map(p=>({x:(p.x-view.left+2)/w*target.width,y:(p.y-view.top+2)/h*target.height,z:p.z}));rasterTriangle(target,q[0],q[1],q[2],f.colors[0],f.colors[1],f.colors[2]);}
+  for(const f of view.faces){const q=f.points.map(p=>({x:(p.x-view.left+2)/w*target.width,y:(p.y-view.top+2)/h*target.height,z:p.z,u:p.u,v:p.v,w:p.w}));rasterTriangle(target,q[0],q[1],q[2],f.colors[0],f.colors[1],f.colors[2],f.texture);}
 }
 export const pilotRasterHeight=view=>view.bottom-view.top>320?432:view.bottom-view.top>192?288:view.bottom-view.top>96?192:96;
 export class PilotCanvas{

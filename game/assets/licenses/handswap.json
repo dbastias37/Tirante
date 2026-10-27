@@ -1,0 +1,13 @@
+{
+  "sourceName": "HandSwap.blend",
+  "author": "Axel (EAFG), from embedded model notes",
+  "sha256": "64a28d8c39b67914968bc660bdc2f27a46ae731618ad4efb981e5a468a61c1ab",
+  "sourceLicense": "No explicit license text embedded. User supplied for this game.",
+  "texture": "Not supplied; author explicitly excludes original skin texture. Game uses its own skin material.",
+  "adaptations": [
+    "One fitted hand, mirrored for the other side",
+    "Original mesh and finger deformation weights",
+    "Game-specific reel grip; no punch animation or editor constraints",
+    "Closed wrist and two detail levels"
+  ]
+}

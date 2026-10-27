@@ -1,6 +1,6 @@
 // Depth-tested triangle drawing for the equipment preview when WebGL is absent.
 // Sorting whole faces loses the holes and narrow rims at oblique angles.
-export function rasterTriangle(target,a,b,c,rgb,rgbB=null,rgbC=null){
+export function rasterTriangle(target,a,b,c,rgb,rgbB=null,rgbC=null,texture=null){
   const {width,height,depth,data}=target;
   const smooth=rgbB!==null&&rgbC!==null;
   const red0=smooth?rgb[0]-rgbC[0]:0,red1=smooth?rgbB[0]-rgbC[0]:0;
@@ -19,10 +19,16 @@ export function rasterTriangle(target,a,b,c,rgb,rgbB=null,rgbC=null){
       if(w0<-.00001||w1<-.00001||w0+w1>1.00001)continue;
       const z=c.z+w0*(a.z-c.z)+w1*(b.z-c.z);
       if(z>=depth[index])continue;
+      let r=smooth?rgbC[0]+w0*red0+w1*red1:rgb[0],g=smooth?rgbC[1]+w0*green0+w1*green1:rgb[1],b0=smooth?rgbC[2]+w0*blue0+w1*blue1:rgb[2];
+      if(texture){
+        const w2=1-w0-w1,den=w0*a.w+w1*b.w+w2*c.w;
+        const u=(w0*a.u*a.w+w1*b.u*b.w+w2*c.u*c.w)/den,v=(w0*a.v*a.w+w1*b.v*b.w+w2*c.v*c.w)/den;
+        const tx=Math.max(0,Math.min(texture.width-1,Math.round(u*texture.width-.5))),ty=Math.max(0,Math.min(texture.height-1,Math.round((1-v)*texture.height-.5))),at=(ty*texture.width+tx)*4,pixel=texture.data;
+        if(pixel[at+3]<(texture.alphaTest??.45)*255)continue;
+        r*=pixel[at]/255;g*=pixel[at+1]/255;b0*=pixel[at+2]/255;
+      }
       depth[index]=z;const offset=index*4;
-      data[offset]=smooth?rgbC[0]+w0*red0+w1*red1:rgb[0];
-      data[offset+1]=smooth?rgbC[1]+w0*green0+w1*green1:rgb[1];
-      data[offset+2]=smooth?rgbC[2]+w0*blue0+w1*blue1:rgb[2];data[offset+3]=255;
+      data[offset]=r;data[offset+1]=g;data[offset+2]=b0;data[offset+3]=255;
     }
   }
 }

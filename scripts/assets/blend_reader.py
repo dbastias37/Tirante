@@ -103,6 +103,19 @@ class Blend:
         data = next(d for d in self.records('Mesh') if self.name(d, 'Mesh') == name)
         f = self.field
         vertices = [f(v, 'MVert', 'co') for v in self.rows(f(data, 'Mesh', 'mvert'), 'MVert')]
+        # Blender 2.62 stores face corners directly, before loop-based meshes.
+        if not f(data, 'Mesh', 'totpoly') and f(data, 'Mesh', 'totface'):
+            faces,uv_faces=[],[]
+            tex=self.rows(f(data,'Mesh','mtface'),'MTFace')
+            for j,row in enumerate(self.rows(f(data,'Mesh','mface'),'MFace')):
+                corners=[f(row,'MFace',k) for k in ['v1','v2','v3']]
+                fourth=f(row,'MFace','v4')
+                if fourth:corners.append(fourth)
+                coords=f(tex[j],'MTFace','uv') if j<len(tex) else None
+                for k in range(1,len(corners)-1):
+                    faces.append([corners[0],corners[k],corners[k+1]])
+                    if coords:uv_faces.append([coords[i*2:i*2+2] for i in [0,k,k+1]])
+            return vertices,faces,uv_faces
         loops = [f(v, 'MLoop', 'v') for v in self.rows(f(data, 'Mesh', 'mloop'), 'MLoop')]
         uv = []
         cd = f(data, 'Mesh', 'ldata')
@@ -122,6 +135,11 @@ class Blend:
 
     def packed_image(self, name):
         data = next(d for d in self.records('Image') if self.name(d, 'Image') == name)
-        packed = self.addresses[self.field(data, 'Image', 'packedfile')]['data']
+        address=self.field(data,'Image','packedfile')
+        if not address and 'packedfiles' in self.types['Image']['fields']:
+            first=self.field(self.field(data,'Image','packedfiles'),'ListBase','first')
+            if first:address=self.field(self.addresses[first]['data'],'ImagePackedFile','packedfile')
+        if not address:raise ValueError('Image is not packed: '+name)
+        packed = self.addresses[address]['data']
         size = self.field(packed, 'PackedFile', 'size')
         return self.addresses[self.field(packed, 'PackedFile', 'data')]['data'][:size]

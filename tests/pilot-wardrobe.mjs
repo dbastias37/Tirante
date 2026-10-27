@@ -1,24 +1,24 @@
 import assert from 'node:assert/strict';
 import {PilotModel} from '../game/pilot-model.js';
 import {KitePhysics} from '../game/physics.js';
-import {PILOT_WARDROBE} from '../game/pilot-wardrobe.js';
+import {PILOT_KIT} from '../game/pilot-kit-data.js';
 import {Vector3,PerspectiveCamera,Box3} from '../game/vendor/three.module.js';
 import {pilotFaces,rasterPilot} from '../game/pilot-canvas.js';
 import {rasterTriangle} from '../game/software-raster.js';
 
 // Actual shoes have a grounded sole, original diffuse colours, left/right shape
 // and a bounded silhouette at both detail levels.
-for(const source of PILOT_WARDROBE.sneaker){
+for(const source of PILOT_KIT.shoe.levels){
  const x=[],y=[],z=[];for(let i=0;i<source.vertices.length;i+=3){x.push(source.vertices[i]);y.push(source.vertices[i+1]);z.push(source.vertices[i+2]);}
  assert.ok(Math.min(...y)>=0&&Math.max(...y)<.18);
  assert.ok(Math.max(...z)-Math.min(...z)>.27&&Math.max(...z)-Math.min(...z)<.29);
  assert.ok(Math.max(...x)-Math.min(...x)<.12);
- assert.ok(Math.max(...source.colors)>200&&Math.min(...source.colors)<30,'Original light sole and dark upper stay distinct');
+ assert.ok(Math.max(...source.colors)>170&&Math.min(...source.colors)<35,'Light fabric and dark rubber remain distinct');
 }
 const counts=[];
 for(let i=0;i<3;i++){
  const p=new KitePhysics(),m=new PilotModel(i);p.launch();p.anchor.set(i*18,1.35,0);
- assert.equal(m.garment.kind,i===2?'hoodie':'tee');
+ assert.equal(m.garment.kind,['sweater','tee','hoodie'][i]);
  for(const level of m.garment.levels)for(let j=0;j<level.weights.length;j+=3){assert.ok(Math.abs(level.weights[j]+level.weights[j+1]+level.weights[j+2]-1)<1e-6);}
  // A free arm after elimination, reeling, strong pulls and changing heading
  // exercise the actual game rig, rather than a static asset preview.

@@ -20,12 +20,12 @@ test('Servidor portable: archivos, dos jugadores, estampados y persistencia',asy
 
   await t.test('Publica el juego y bloquea archivos internos',async()=>{
     const root=await fetch(base);assert.equal(root.status,200);assert.match(root.headers.get('content-type'),/text\/html/);assert.match(await root.text(),/TIRANTE/i);
-    for(const [path,type] of [['/app.js?v=1.19.0','javascript'],['/style.css','css'],['/pilot-wardrobe-data.js','javascript'],['/pilot-walk-data.js','javascript'],['/pilot-locomotion.js','javascript'],['/pilot-appearance.js','javascript'],['/pilot-fabric.js','javascript'],['/pilot-hands.js','javascript'],['/pilot-surface.js','javascript'],['/credits.html','html'],['/assets/licenses/sneakers-original.html','html'],['/vendor/three.module.js','javascript']]){
+    for(const [path,type] of [['/app.js?v=1.20.0','javascript'],['/style.css','css'],['/pilot-wardrobe-data.js','javascript'],['/pilot-walk-data.js','javascript'],['/pilot-locomotion.js','javascript'],['/pilot-appearance.js','javascript'],['/pilot-fabric.js','javascript'],['/pilot-hands.js','javascript'],['/pilot-surface.js','javascript'],['/pilot-kit-data.js','javascript'],['/pilot-hand-data.js','javascript'],['/pilot-textures.js','javascript'],['/assets/pilots/alma-face.webp','image/webp'],['/assets/pilots/mateo-face.webp','image/webp'],['/assets/pilots/nico-face.webp','image/webp'],['/assets/pilots/sport-shoe.webp','image/webp'],['/credits.html','html'],['/assets/licenses/sneakers-original.html','html'],['/vendor/three.module.js','javascript']]){
       const res=await fetch(base+path);assert.equal(res.status,200,path);assert.match(res.headers.get('content-type'),new RegExp(type));await res.arrayBuffer();
     }
     const head=await fetch(base,{method:'HEAD'});assert.equal(head.status,200);assert(Number(head.headers.get('content-length'))>0);assert.equal(await head.text(),'');
     const cached=await fetch(base,{headers:{'If-None-Match':head.headers.get('etag')}});assert.equal(cached.status,304);
-    const health=await fetch(base+'/healthz');assert.deepEqual(await health.json(),{ok:true,version:'1.19.0',storage:'sqlite+files'});
+    const health=await fetch(base+'/healthz');assert.deepEqual(await health.json(),{ok:true,version:'1.20.0',storage:'sqlite+files'});
     for(const path of ['/.env','/%2eenv','/data/tirante.sqlite','/server/index.mjs','/package.json','/unknown.js','/api/missing','/%2e%2e%2fserver%2frooms.js']){
       const res=await fetch(base+path);assert.equal(res.status,404,path);await res.arrayBuffer();
     }

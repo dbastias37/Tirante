@@ -2,8 +2,8 @@ import * as T from './vendor/three.module.js';
 import {PilotLocomotion,PilotTrousers,legRotation} from './pilot-locomotion.js';
 import {PilotHand} from './pilot-hands.js';
 import {PilotArmSurface,PilotNeckSurface} from './pilot-surface.js';
-import {faceLevel} from './pilot-appearance.js';
-import {PILOT_HEADS} from './pilot-heads.js';
+import {PILOT_KIT} from './pilot-kit-data.js';
+import {pilotTextureMaterial} from './pilot-textures.js';
 import {FittedGarment,wardrobeGeometry,PILOT_WARDROBE} from './pilot-wardrobe.js';
 
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),UP=V(0,1,0);
@@ -73,18 +73,16 @@ export class PilotModel{
   constructor(index=0){
     this.index=index;this.group=new T.Group();this.group.name='pilot';this.yaw=0;this.initialized=false;this.lastTime=null;this.parts=[];this.detail=0;
     const female=index%3===1;
-    this.skin=material([0xc58f69,0xd3a17c,0x946447][index%3]);this.top=material(0x397f80);this.top.vertexColors=true;this.dark=material(0x263d3b);this.pants=material([0x354a58,0x3f414b,0x4a4b3d][index%3]);this.shoe=material(0xffffff);this.shoe.vertexColors=true;this.shoe.roughness=.82;this.sole=material(0xd6ccad);this.hair=material([0x302a25,0x33231e,0x332c22][index%3]);this.cream=material(0xe9ddbd);this.wood=material(0x9b7048);
+    this.skin=material([0xe7aa83,0xd5a88b,0x583524][index%3]);this.top=material(0x397f80);this.top.vertexColors=true;this.dark=material(0x263d3b);this.pants=material([0x354a58,0x3f414b,0x4a4b3d][index%3]);this.shoe=material(0xffffff);this.shoe.vertexColors=true;this.shoe.roughness=.82;this.sole=material(0xd6ccad);this.hair=material([0x302a25,0x33231e,0x332c22][index%3]);this.cream=material(0xe9ddbd);this.wood=material(0x9b7048);
     this.body=new T.Group();this.group.add(this.body);this.body.position.y=.96;
-    this.garment=new FittedGarment(index%3===2?'hoodie':'tee',this.top);this.group.add(this.garment.mesh);this.torso=this.garment.mesh;
-    this.underbody=add(this.body,rings([[.005,.125,.073],[.20,.142,.080],[.38,.158,.080],[.455,.175,.070],[.51,.075,.058]],16),this.skin);this.underbody.name='solid-under-shirt';
+    this.garment=new FittedGarment(['sweater','tee','hoodie'][index%3],this.top);this.group.add(this.garment.mesh);this.torso=this.garment.mesh;
+    this.underbody=add(this.body,rings([[.005,.125,.073],[.20,.142,.080],[.38,.158,.080],[.455,.175,.070],[.51,.075,.058]],16),this.skin);this.underbody.name='solid-under-shirt';if(this.garment.kind==='sweater')this.underbody.scale.set(.86,1,.86);
     this.neckSurface=new PilotNeckSurface(this.skin);this.neck=this.neckSurface.mesh;this.body.add(this.neck);
     this.head=new T.Group();this.head.position.set(0,.57,0);this.body.add(this.head);
-    this.faceSkin=this.skin.clone();this.faceSkin.vertexColors=true;this.hair.vertexColors=true;
-    this.headLevels=[PILOT_HEADS[female?1:0],PILOT_WARDROBE.distantHeads[female?1:0]].map((source,level)=>faceLevel(source,index,level===1));
-    this.face=add(this.head,this.headLevels[0].geometry,this.faceSkin);
-    const detailMaterial=material(0xffffff);detailMaterial.vertexColors=true;this.features=add(this.head,this.headLevels[0].features,detailMaterial);this.features.name='facial-features';
-    this.hairMesh=add(this.head,this.headLevels[0].hair,this.hair);this.hairMesh.name='hair';
-    if(female)ball(this.head,this.hair,V(0,.14,.105),V(.043,.075,.04));
+    const kitHead=PILOT_KIT.heads[index%3];
+    this.faceSkin=pilotTextureMaterial(kitHead.texture);
+    this.headLevels=kitHead.levels.map(source=>({geometry:wardrobeGeometry(source)}));
+    this.face=add(this.head,this.headLevels[0].geometry,this.faceSkin);this.face.name='kit-head';
     this.locomotion=new PilotLocomotion();this.trousers=new PilotTrousers(this.pants);this.hips=this.trousers.mesh;this.group.add(this.hips);
     this.arms=[];this.legs=[];
     for(const s of [-1,1]){
@@ -93,8 +91,8 @@ export class PilotModel{
       const hand=new PilotHand(s,this.skin),palm=hand.group;this.group.add(palm);this.arms.push({s,upper,lower,cuff,palm,hand,surface});
       const thigh=new T.Object3D(),shin=new T.Object3D();this.group.add(thigh,shin);
       const shoeGroup=new T.Group();this.group.add(shoeGroup);
-      const shoeLevels=PILOT_WARDROBE.sneaker.map(source=>wardrobeGeometry(source,s));
-      const sneaker=add(shoeGroup,shoeLevels[0],this.shoe);sneaker.name='sneaker';
+      const shoeLevels=PILOT_KIT.shoe.levels.map(source=>wardrobeGeometry(source,s));
+      const sneaker=add(shoeGroup,shoeLevels[0],pilotTextureMaterial(PILOT_KIT.shoe.texture));sneaker.name='sneaker';
       const sock=add(shoeGroup,new T.CylinderGeometry(.028,.032,.11,12),this.pants,V(0,.135,0));sock.name='ankle-cuff';
       const solePoints=[];for(const g of shoeLevels)for(let i=0;i<g.attributes.position.count;i++){const v=V().fromBufferAttribute(g.attributes.position,i);solePoints.push(v);}
       this.legs.push({s,thigh,shin,shoe:shoeGroup,sneaker,shoeLevels,solePoints});
@@ -107,7 +105,7 @@ export class PilotModel{
   configure(tint){if(this.tint===tint)return;this.tint=tint;this.top.color.set(tint);this.dark.color.set(tint).multiplyScalar(.40);}
   setDetail(level){
     if(this.detail===level)return;this.detail=level;this.garment.setDetail(level);
-    this.face.geometry=this.headLevels[level].geometry;this.hairMesh.geometry=this.headLevels[level].hair;this.features.geometry=this.headLevels[level].features;
+    this.face.geometry=this.headLevels[level].geometry;
     for(const leg of this.legs)leg.sneaker.geometry=leg.shoeLevels[level];
     for(const arm of this.arms)arm.hand.setDetail(level);
     for(const part of this.parts)part.userData.canvasVertices=null;
@@ -140,7 +138,7 @@ export class PilotModel{
       if(s<0&&!inactive)arm.palm.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(V(0,0,1),V(-1,0,0),V(0,-1,0)));
       else arm.palm.rotation.set(s<0?-.45:0,0,s<0?-.12:0);
       arm.hand.pose(s>0?.95:inactive?.15:p.action==='release'?.12:p.action==='reel'?.40:.20,dt);
-      arm.surface.update(a,e,b,arm.palm,this.garment.kind==='hoodie');
+      arm.surface.update(a,e,b,arm.palm,this.garment.kind!=='tee');
     }
     for(let i=0;i<this.legs.length;i++){
       const leg=this.legs[i],foot=gait.feet[i],knee=elbow(foot.hip,foot.ankle,foot.knee,.43,.43);

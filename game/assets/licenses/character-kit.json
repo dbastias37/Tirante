@@ -1,0 +1,20 @@
+{
+  "sourceName": "clothing and character kit_1.0.blend",
+  "sha256": "69b40d48d848342410896c47abfd47d87acd290a5b648ef690a1fa40f62b50ef",
+  "sourceLicense": "No explicit license or author credit embedded in the supplied file. User supplied for this game.",
+  "heads": [
+    "make3",
+    "make5",
+    "make1"
+  ],
+  "shoe": "make6.001",
+  "sweater": "low_poly_shirt.001_Retopo_Mesh_Plane.001",
+  "adaptations": [
+    "Bust removed; fitted to continuous game neck",
+    "Two geometry detail levels",
+    "Original UV islands retained in cropped texture atlases",
+    "Invisible teeth and tongue omitted",
+    "Sweater rest pose fitted to the game shoulders and forearms",
+    "Sports shoes fitted to existing planted-foot animation"
+  ]
+}

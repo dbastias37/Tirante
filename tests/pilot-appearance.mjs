@@ -16,21 +16,21 @@ for(let index=0;index<3;index++){
   const support=m.arms[1],guide=m.arms[0],hold=support.palm.position.clone();
   for(const level of [0,1]){
     m.setDetail(level);m.update(p,.1);
-    // Face ribbons used to have reversed winding, invisible with GPU culling.
-    const features=m.features.geometry;
-    for(let i=0;i<features.index.count;i+=3)assert.ok(triangleNormal(features,i).z<0,'Eyes, brows and lips face outwards');
-    assert.ok(features.attributes.color.count===features.attributes.position.count);
-    for(const hand of m.arms.map(a=>a.hand))for(const curl of [0,1]){
-      hand.curl=null;hand.pose(curl);
-      const g=hand.mesh.geometry;
-      // The end of every digit must be closed and face away from the finger.
-      for(const r of hand.levels[level].rings){
-        const tip=V().fromBufferAttribute(g.attributes.position,r.capIndex),previous=V();
-        const {sides,steps}=hand.levels[level];
-        for(let j=0;j<sides;j++)previous.add(V().fromBufferAttribute(g.attributes.position,r.start+(steps-1)*sides+j));
-        const direction=tip.clone().sub(previous.divideScalar(sides)).normalize();
-        for(let i=0;i<g.index.count;i+=3)if(g.index.getX(i)===r.capIndex)assert.ok(triangleNormal(g,i).dot(direction)>.85,'Fingertips stay outward-facing when bent');
+    const face=m.face.geometry;
+    assert.equal(face.attributes.uv.count,face.attributes.position.count);
+    assert.ok(face.attributes.uv.array.every(x=>x>=0&&x<=1),'Atlas coordinates stay inside the cropped source textures');
+    for(const hand of m.arms.map(a=>a.hand)){
+      const g=hand.mesh.geometry,edges=new Map();
+      for(let i=0;i<g.index.count;i+=3)for(let j=0;j<3;j++){
+        const a=g.index.getX(i+j),b=g.index.getX(i+(j+1)%3),key=[Math.min(a,b),Math.max(a,b)].join(',');edges.set(key,(edges.get(key)||0)+1);
       }
+      for(const n of edges.values())assert.equal(n,2,'The imported hand has no open wrist or finger edges');
+      hand.curl=null;hand.pose(0);const open=g.attributes.position.array.slice();
+      hand.curl=null;hand.pose(1);let moved=0;
+      for(let i=0;i<open.length;i+=3){const displacement=Math.hypot(open[i]-g.attributes.position.array[i],open[i+1]-g.attributes.position.array[i+1],open[i+2]-g.attributes.position.array[i+2]);if(displacement>.005)moved++;}
+      assert.ok(moved>40,'Closing the hand moves the actual finger mesh');
+      const wrist=[];for(let i=0;i<open.length;i+=3)if(open[i+2]>.003)wrist.push(i);
+      for(const i of wrist)assert.ok(Math.hypot(open[i]-g.attributes.position.array[i],open[i+1]-g.attributes.position.array[i+1],open[i+2]-g.attributes.position.array[i+2])<.001,'Finger flexion leaves the wrist attached to its arm');
     }
     support.hand.curl=null;guide.hand.curl=null;
     for(const action of ['hold','release','reel'])for(let step=0;step<12;step++){
@@ -50,4 +50,4 @@ for(let index=0;index<3;index++){
     p.eliminated=true;m.update(p,m.lastTime+.1);assert.ok(guide.palm.position.y<1.1);assert.ok(support.palm.position.distanceTo(hold)<1e-10);p.eliminated=false;
   }
 }
-console.log(`PASS: facial front faces, five closed articulated digits, fixed axle grip, paused fingers, finite matched cloth/face buffers and exact line anchor in ${poses} animated poses.`);
+console.log(`PASS: UV-mapped faces, closed imported hand topology, articulated finger motion, fixed axle grip, paused fingers, finite matched cloth/face buffers and exact line anchor in ${poses} animated poses.`);

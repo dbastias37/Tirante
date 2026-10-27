@@ -42,7 +42,7 @@ export class PilotArmSurface{
     const bend=t=>start.clone().multiplyScalar((1-t)**2).addScaledVector(elbow,2*t*(1-t)).addScaledVector(end,t*t);
     const centers=[shoulder.clone().addScaledVector(upper,-.018),shoulder.clone(),shoulder.clone().addScaledVector(upper,.085),shoulder.clone().addScaledVector(upper,.17),start,bend(.25),bend(.5),bend(.75),end,elbow.clone().addScaledVector(lower,.100),wrist.clone().addScaledVector(lower,-.070),wrist.clone().addScaledVector(lower,-.032),wrist.clone(),wrist.clone().addScaledVector(forward,.014)];
     const radii=[[.029,.029],[.035,.035],[.051,.050],[.049,.047],[.041,.042],[.041,.041],[.042,.041],[.043,.041],[.047,.043],[.043,.039],[.034,.031],[.028,.024],[.025,.014],[.029,.015]];
-    if(covered)for(let i=0;i<12;i++)radii[i]=radii[i].map(r=>r*(i<10?.57:.8));
+    if(covered)for(let i=0;i<12;i++)radii[i]=radii[i].map(r=>r*(i<10?.45:.65));
     this.surface.update(centers,radii,palm.quaternion);
   }
 }

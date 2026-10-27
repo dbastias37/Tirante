@@ -1,6 +1,6 @@
 # Modelos de los NPC
 
-Los dos archivos fueron aportados por el usuario para vestir a los participantes de Tirante. Las licencias HTML originales se conservan sin cambios junto a este documento. Las modificaciones descritas aquí no implican patrocinio ni aprobación de sus autores.
+Los archivos fueron aportados por el usuario para vestir a los participantes de Tirante. Las licencias HTML originales se conservan sin cambios junto a este documento. Las modificaciones descritas aquí no implican patrocinio ni aprobación de sus autores.
 
 ## Shirt Template
 
@@ -33,3 +33,15 @@ Los dos archivos fueron aportados por el usuario para vestir a los participantes
 - El GLB original aportado no se redistribuye en este repositorio. Su atribución y SHA-256 se conservan en `walk-cycle.json`.
 - Adaptaciones: conversión de escala/ejes, extracción y ajuste del pantalón continuo, pesos de piel reasignados a las piernas del jugador, ciclo muestreado a 48 Hz e interpolado, velocidad según desplazamiento, apoyo mundial del pie y brazos independientes para sostener el carrete. Se conservan las caras, ropa y zapatillas ya adaptadas.
 - Conversión reproducible: `python scripts/assets/export_pilot_walk.py /ruta/al/walk_cycle.glb`. Requiere numpy y scipy solo durante la exportación. El navegador carga unos 23 KB de datos derivados, sin cargar el GLB ni añadir bibliotecas.
+
+## Clothing and Character Kit 1.0 (1.20)
+
+Archivo aportado `clothing and character kit_1.0.blend`, Blender 2.91. Se seleccionan las cabezas `make3`, `make5`, `make1`, el calzado deportivo `make6.001` y `low_poly_shirt.001_Retopo_Mesh_Plane.001`. Las cabezas sustituyen las referencias BodyChan/BodyKun; las zapatillas sustituyen las Sneakers anteriores en la partida. Se conservan los créditos anteriores porque sus datos derivados siguen en el historial y los conversores.
+
+No hay textos internos que acrediten autor o licencia específica del kit. Esta ausencia no se interpreta como dominio público. Se registra el origen proporcionado por el usuario y la huella del archivo en `character-kit.json`; el original no se publica. Las texturas empaquetadas se recortan y reducen para los atlas del juego. El conversor `export_pilot_kit.py` lee datos sin ejecutar scripts.
+
+## HandSwap (1.20)
+
+Archivo aportado `HandSwap.blend`, Blender 2.62. Las notas internas identifican a **Axel (EAFG)** y excluyen expresamente la textura de piel por su licencia. No se utiliza esa textura: no está presente en el archivo. La malla y sus pesos se adaptan a los dedos de los NPC y se usa el material de piel del juego. No se importan las animaciones de golpe ni los controles de edición.
+
+No se encontró una licencia expresa en el archivo recibido; no se inventa una. Huella y decisiones en `handswap.json`; conversión reproducible con `export_pilot_hands.py`. El original permanece fuera del repositorio.
