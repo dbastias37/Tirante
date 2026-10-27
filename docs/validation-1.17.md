@@ -23,3 +23,12 @@ Las pruebas de vestuario verifican 72 combinaciones de pose y nivel de detalle: 
 ## Límites
 
 No se incorporó el cuerpo completo del GLB: se adaptaron su ciclo y malla de piernas para conservar la identidad y el vestuario existentes. La animación es una adaptación para vuelo con carrete; giros, frenadas y pasos laterales no cuentan con capturas específicas. El navegador de pruebas usa Canvas por falta de WebGL; no se ha medido rendimiento GPU.
+
+## Resultado verificado
+
+- `npm run build`: 80 módulos comprobados.
+- `npm test`: batería completa aprobada; 10 pruebas HTTP/SQLite aprobadas.
+- Render publicó el commit de implementación `1e1dfa0a919d89c86a7e76a483daf9622d042922` (deploy `dep-dbgaqda9lscs7396etfg`, estado `live`).
+- `/healthz`: HTTP 200, versión 1.17.0. `pilot-locomotion.js`, `pilot-walk-data.js`, `pilot-model.js` y `npc-pilot.js` publicados coinciden byte a byte con los archivos locales probados.
+- Revisión de Party con tres NPC, selección de Mateo/Alma/Nico y tirón durante partida activa. El fallback Canvas muestra las prendas, piernas y carrete; no aparecieron errores de la aplicación aparte del aviso esperado de WebGL no disponible.
+- Captura real de la web: [Party 1.17](tirante-1-17-party.jpg). El GIF del ciclo se genera por separado con el renderizador del juego y un desplazamiento controlado.
