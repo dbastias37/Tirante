@@ -13,7 +13,7 @@ La figura masculina separa busto, abdomen, pelvis, cuello, cabeza, brazos, anteb
 - Los brazos usan cadenas de dos articulaciones para alcanzar el carrete. Los dedos forman una mano con palma, pulgar y falanges curvadas. Las piernas responden al desplazamiento real del NPC; no caminan si el anclaje está quieto.
 - El personaje mira su propio volantín, mueve el carrete según soltar/recoger, acompaña los tirones y relaja el brazo al quedar eliminado. La animación se detiene con el tiempo de la simulación.
 - El carrete mantiene su salida exactamente sobre el anclaje físico, también al girar y moverse. La representación del personaje nunca modifica las fuerzas del volantín.
-- En 1.16 cada personaje usa 9.966–11.076 triángulos de cerca y 4.614–5.022 a distancia, con 16–21 grupos de dibujo. Las piezas estáticas de manos y carrete se agrupan por material; cada prenda y cada zapatilla ocupan un solo grupo. WebGL y Canvas usan los mismos modelos; Canvas interpola el color y resuelve la profundidad en buffers reutilizables de 64×96, 128×192 o 192×288 según el tamaño proyectado.
+- En 1.16 cada personaje usa 9.998–11.108 triángulos de cerca y 4.646–5.054 a distancia, con 17–22 grupos de dibujo. Las piezas estáticas de manos y carrete se agrupan por material; cada prenda y cada zapatilla ocupan un solo grupo. WebGL y Canvas usan los mismos modelos; Canvas interpola el color y resuelve la profundidad en buffers reutilizables de 64×96, 128×192 o 192×288 según el tamaño proyectado.
 - «Ver jugadores» / P enfoca a los contrincantes dentro de la partida en curso. Permite recorrerlos y orbitar; C o V regresan al vuelo. No abre una demostración separada del modelo.
 
 El archivo de Blender original y sus controles no se descargan ni se ejecutan en el navegador.

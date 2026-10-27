@@ -58,6 +58,14 @@ function reel(parent,wood,thread,trim){
   bake(spin);return {rig,spin};
 }
 
+function contactShadow(parent){
+  const g=new T.CircleGeometry(1,32),colors=[];
+  for(let i=0;i<g.attributes.position.count;i++)colors.push(1,1,1,i===0?.22:0);
+  g.setAttribute('color',new T.Float32BufferAttribute(colors,4));
+  const mat=new T.MeshBasicMaterial({color:0x21432f,vertexColors:true,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2});
+  const shadow=add(parent,g,mat,V(0,.008,-.05),V(.42,.27,1));shadow.rotation.x=-Math.PI/2;shadow.name='pilot-contact-shadow';return shadow;
+}
+
 // A game rig rebuilt around the uploaded drawing figures' proportions:
 // separate pelvis/chest, two-link limbs, shaped head, wrists and articulated grip.
 // Clothing bridges the mannequin gaps; no editor rigs or scripts run in the game.
@@ -94,6 +102,7 @@ export class PilotModel{
     }
     const r=reel(this.group,this.wood,this.cream,this.dark);this.reel=r.rig;this.spool=r.spin;
     this.outlet=new T.Object3D();this.outlet.position.set(0,1.35,-.40);this.group.add(this.outlet);
+    this.shadow=contactShadow(this.group);
     this.configure('#397f80');this.group.traverse(m=>{if(m.isMesh&&m.visible){m.castShadow=false;this.parts.push(m);}});
   }
   configure(tint){if(this.tint===tint)return;this.tint=tint;this.top.color.set(tint);this.dark.color.set(tint).multiplyScalar(.40);}

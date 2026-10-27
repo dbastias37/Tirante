@@ -8,6 +8,7 @@ export function pilotFaces(model,camera,width,height){
   const result=[],normal=new Vector3(),normalMatrix=new Matrix3(),color=new Color();
   let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const m of model.parts){
+    if(m===model.shadow)continue;
     const g=m.geometry,p=g.attributes.position,index=g.index,n=g.attributes.normal,colors=g.attributes.color;normalMatrix.getNormalMatrix(m.matrixWorld);
     const cache=m.userData.canvasVertices||(m.userData.canvasVertices=Array.from({length:p.count},()=>({world:new Vector3(),screen:new Vector3(),rgb:[0,0,0]})));
     for(let i=0;i<p.count;i++){
@@ -42,6 +43,12 @@ export class PilotCanvas{
   draw(ctx,model,camera,width,height){
     const center=model.group.position.clone().add(new Vector3(0,.9,0)).project(camera);if(center.z<-1||center.z>1||Math.abs(center.x)>1.4||Math.abs(center.y)>2)return;
     const view=pilotFaces(model,camera,width,height);if(!view.faces.length||view.right<0||view.left>width||view.bottom<0||view.top>height)return;
+    const project=(x,y)=>{const q=new Vector3(x,y,0).applyMatrix4(model.shadow.matrixWorld).project(camera);return {x:(q.x*.5+.5)*width,y:(.5-q.y*.5)*height,z:q.z};};
+    const o=project(0,0),x=project(1,0),y=project(0,1);
+    if(o.z>=-1&&o.z<=1){
+      ctx.save();ctx.transform(x.x-o.x,x.y-o.y,y.x-o.x,y.y-o.y,o.x,o.y);
+      const shade=ctx.createRadialGradient(0,0,0,0,0,1);shade.addColorStop(0,'rgba(33,67,47,.22)');shade.addColorStop(.5,'rgba(33,67,47,.11)');shade.addColorStop(1,'rgba(33,67,47,0)');ctx.fillStyle=shade;ctx.beginPath();ctx.arc(0,0,1,0,Math.PI*2);ctx.fill();ctx.restore();
+    }
     const buffer=this.buffers.get(pilotRasterHeight(view));rasterPilot(view,buffer.target);buffer.ctx.putImageData(buffer.image,0,0);ctx.drawImage(buffer.canvas,view.left-2,view.top-2,view.right-view.left+4,view.bottom-view.top+4);
   }
 }
