@@ -17,6 +17,12 @@
 Microprueba CPU aislada: 120 fotogramas tras 20 de calentamiento, un NPC a 18 m, Node 24.22.1. Actualización, proyección y rasterización: 3,97 ms por fotograma con 1.15 y 2,63 ms con 1.16 y su buffer adaptado a la altura proyectada. No son FPS del juego ni mediciones de una GPU.
 
 
+Comprobación pública: implementación `828f268` y acabado `e394e9d` en estado `live` en Render. `/healthz` devuelve `ok: true`, versión `1.16.0`; los cuatro módulos de personajes/ropa publicados coinciden byte por byte con el repositorio. En una Party de tres NPC se recorrieron Mateo, Alma y Nico con «Ver jugadores», se volvió a primera persona y se probaron soltar, recoger y tirón ya en juego; este último consumió energía hasta 93 %. Se comprobó también la página de créditos y la entrega HTTP de las licencias.
+
+El navegador de revisión no ofrece WebGL y utilizó Canvas. No aparecieron errores de la aplicación distintos del aviso esperado de cambio de renderer. La revisión visual demuestra el resultado de Canvas; no sustituye una medición de rendimiento en una GPU real.
+
+Capturas del juego publicado: [polera y zapatillas de Mateo](tirante-1-16-polera.jpg), [polerón y zapatillas de Nico durante Party](tirante-1-16-poleron.jpg).
+
 ## Hilo natural y contrincantes vestidos · 1.15.0 · 26 de octubre de 2026
 
 - `npm run build`: 74 módulos comprobados. `npm test`: batería completa aprobada, incluidas diez pruebas del servidor. Tras agrupar piezas estáticas del personaje se repitió `pilot-model` y el build; tras ajustar el cambio de cámara de espectador se repitió `game-flow` y el build.
