@@ -1,4 +1,5 @@
 import * as T from './vendor/three.module.js';
+import {PilotLocomotion,PilotTrousers,legRotation} from './pilot-locomotion.js';
 import {PILOT_HEADS} from './pilot-heads.js';
 import {FittedGarment,wardrobeGeometry,PILOT_WARDROBE} from './pilot-wardrobe.js';
 
@@ -71,7 +72,7 @@ function contactShadow(parent){
 // Clothing bridges the mannequin gaps; no editor rigs or scripts run in the game.
 export class PilotModel{
   constructor(index=0){
-    this.index=index;this.group=new T.Group();this.group.name='pilot';this.phase=0;this.yaw=0;this.initialized=false;this.lastAnchor=V();this.lastTime=null;this.parts=[];this.detail=0;
+    this.index=index;this.group=new T.Group();this.group.name='pilot';this.yaw=0;this.initialized=false;this.lastTime=null;this.parts=[];this.detail=0;
     const female=index%3===1;
     this.skin=material([0xc58f69,0xd3a17c,0x946447][index%3]);this.top=material(0x397f80);this.top.vertexColors=true;this.dark=material(0x263d3b);this.pants=material([0x354a58,0x3f414b,0x4a4b3d][index%3]);this.shoe=material(0xffffff);this.shoe.vertexColors=true;this.shoe.roughness=.82;this.sole=material(0xd6ccad);this.hair=material([0x302a25,0x33231e,0x332c22][index%3]);this.cream=material(0xe9ddbd);this.wood=material(0x9b7048);
     this.body=new T.Group();this.group.add(this.body);this.body.position.y=.96;
@@ -86,19 +87,19 @@ export class PilotModel{
     this.face=add(this.head,this.headLevels[0].geometry,this.skin);
     this.hairMesh=add(this.head,this.headLevels[0].hair,this.hair,V(0,.001,.001),V(1.025,1.01,1.025));this.hairMesh.name='hair';
     if(female)ball(this.head,this.hair,V(0,.14,.105),V(.043,.075,.04));
-    this.hips=add(this.group,rings([[.84,.15,.105],[.97,.16,.12],[1.01,.155,.115]],14),this.pants);
+    this.locomotion=new PilotLocomotion();this.trousers=new PilotTrousers(this.pants);this.hips=this.trousers.mesh;this.group.add(this.hips);
     this.arms=[];this.legs=[];
     for(const s of [-1,1]){
       const upper=add(this.group,rings([[.22,.056,.056],[.35,.057,.055],[.72,.048,.046],[1,.041,.042]],12),this.skin);
       const lower=add(this.group,rings([[0,.042,.043],[.22,.050,.045],[.70,.034,.033],[.87,.030,.029],[1,.029,.027]],12),this.skin);
       const cuff=new T.Object3D();this.group.add(cuff);upper.visible=lower.visible=this.garment.kind==='tee';
       const palm=hand(this.group,this.skin);this.arms.push({s,upper,lower,cuff,palm});
-      const thigh=add(this.group,rings([[0,.09,.098],[.25,.095,.10],[.65,.077,.079],[1,.063,.066]],12),this.pants);
-      const shin=add(this.group,rings([[0,.064,.066],[.25,.071,.073],[.70,.05,.055],[1,.046,.048]],12),this.pants);
+      const thigh=new T.Object3D(),shin=new T.Object3D();this.group.add(thigh,shin);
       const shoeGroup=new T.Group();this.group.add(shoeGroup);
       const shoeLevels=PILOT_WARDROBE.sneaker.map(source=>wardrobeGeometry(source,s));
       const sneaker=add(shoeGroup,shoeLevels[0],this.shoe);sneaker.name='sneaker';
-      this.legs.push({s,thigh,shin,shoe:shoeGroup,sneaker,shoeLevels});
+      const solePoints=[];for(const g of shoeLevels)for(let i=0;i<g.attributes.position.count;i++){const v=V().fromBufferAttribute(g.attributes.position,i);solePoints.push(v);}
+      this.legs.push({s,thigh,shin,shoe:shoeGroup,sneaker,shoeLevels,solePoints});
     }
     const r=reel(this.group,this.wood,this.cream,this.dark);this.reel=r.rig;this.spool=r.spin;
     this.outlet=new T.Object3D();this.outlet.position.set(0,1.35,-.40);this.group.add(this.outlet);
@@ -117,15 +118,16 @@ export class PilotModel{
     this.configure(p.partyTint||'#397f80');
     const dt=this.lastTime===null?0:clamp(time-this.lastTime,0,.1);this.lastTime=time;
     const targetYaw=Math.atan2(-(p.position.x-p.anchor.x),-(p.position.z-p.anchor.z));
-    if(!this.initialized){this.yaw=targetYaw;this.lastAnchor.copy(p.anchor);this.initialized=true;}
+    if(!this.initialized){this.yaw=targetYaw;this.initialized=true;}
     this.yaw+=Math.atan2(Math.sin(targetYaw-this.yaw),Math.cos(targetYaw-this.yaw))*(1-Math.exp(-dt*5));
-    const distance=p.anchor.distanceTo(this.lastAnchor),walking=dt>0?clamp(distance/dt,0,1):(this.walking||0);this.walking=walking;this.phase+=distance*9;this.lastAnchor.copy(p.anchor);
+
     const inactive=p.eliminated||p.state==='cut'||p.state==='ground',load=inactive?0:clamp(p.rope?.stressRatio||0,0,1),tug=inactive?0:Math.sin(clamp((time-p.lastTug)/.32,0,1)*Math.PI);
     this.group.rotation.y=this.yaw;
     // The reel outlet stays exactly at the physical anchor, even while turning.
     const shift=V(0,0,-.40).applyAxisAngle(UP,this.yaw);this.group.position.set(p.anchor.x-shift.x,0,p.anchor.z-shift.z);
-    this.body.position.set(Math.sin(time*1.5+this.index)*.006,.96-Math.abs(Math.sin(this.phase))*.012*walking,load*.035+tug*.035);
-    this.body.rotation.x=load*.11+tug*.09;
+    this.locomotion.update(this.group,dt,this.legs);const gait=this.locomotion;
+    this.body.position.set(Math.sin(time*1.5+this.index)*.006+gait.sway,.96+gait.bob,load*.035+tug*.035);
+    this.body.rotation.set(load*.11+tug*.09,gait.twist*.15,0);
     const look=Math.atan2(p.position.y-1.65,Math.hypot(p.position.x-p.anchor.x,p.position.z-p.anchor.z));this.head.rotation.x=inactive?-.16:clamp(look*.55,-.25,.65);
     this.body.updateMatrix();
     const reelRate=inactive||p.action==='hold'?0:(p.action==='reel'?1:-1)*(p.boost?8:4);this.spool.rotation.x+=dt*reelRate;
@@ -136,12 +138,13 @@ export class PilotModel{
       const wrist=b.clone().lerp(e,.12);segment(arm.cuff,wrist,b);
       arm.palm.position.copy(b);arm.palm.rotation.set(-.3,s<0?.9:-.9,s<0?-.7:.7);
     }
-    for(const leg of this.legs){
-      const s=leg.s,step=Math.sin(this.phase+(s<0?Math.PI:0))*walking;
-      const hip=V(s*.09,.97,load*.02),ankle=V(s*.15,.125+Math.max(0,step)*.065,step*.14+(s<0?.06:-.08));
-      const knee=elbow(hip,ankle,V(s*.2,.50,-.6),.43,.43);segment(leg.thigh,hip,knee);segment(leg.shin,knee,ankle);leg.shoe.position.set(ankle.x,ankle.y-.125,ankle.z);leg.shoe.rotation.y=s*.09;
+    for(let i=0;i<this.legs.length;i++){
+      const leg=this.legs[i],foot=gait.feet[i],knee=elbow(foot.hip,foot.ankle,foot.knee,.43,.43);
+      segment(leg.thigh,foot.hip,knee);segment(leg.shin,knee,foot.ankle);
+      leg.thigh.quaternion.copy(legRotation(foot.hip,knee));leg.shin.quaternion.copy(legRotation(knee,foot.ankle));
     }
-    this.garment.update(this.body,this.arms,this.head);
+    this.trousers.update(gait.pelvis,this.legs);
+    this.garment.update(this.body,this.arms,this.head,gait.pelvis);
     this.group.updateMatrixWorld(true);
   }
 }

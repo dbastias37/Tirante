@@ -1,6 +1,6 @@
 # TIRANTE · El pulso del viento
 
-Simulador de volantines, versión 1.16.0, publicado desde este repositorio en Render.
+Simulador de volantines, versión 1.17.0, publicado desde este repositorio en Render.
 
 ## Instalación actual en Render
 
@@ -22,6 +22,14 @@ La instalación actual usa el plan gratuito, una instancia y `DATA_DIR=/tmp/tira
 - Party local contra 1–3 NPC, Rastro de luz contrarreloj y duelo online para dos personas.
 - Interfaz compacta para móvil, renderer WebGL y alternativa Canvas.
 - Servidor Node.js, base SQLite, almacenamiento de estampados y pruebas automatizadas.
+
+## Cambios de la versión 1.17.0
+
+- Ciclo de caminata del GLB aportado, adaptado a la ropa y al manejo del carrete. Pasos por distancia recorrida, apoyo de talón/punta, cadera, paradas y desplazamiento lateral/hacia atrás.
+- Malla continua de pantalones derivada del personaje del GLB; rodillas con orientación estable y apoyo del pie en coordenadas del mundo. Mismo modelo animado en WebGL y Canvas.
+- Los NPC avanzan a 0,65 m/s en cada paso de física; sus decisiones de combate ya no producen saltos del personaje ni del anclaje del hilo. Se conserva la separación mínima de 13 m.
+- Atribución de Walk Cycle (skywarrior34niraj, CC BY 4.0) en Créditos. Conversor incluido para reproducir la adaptación usando el GLB aportado.
+- Validación y límites: [docs/validation-1.17.md](docs/validation-1.17.md).
 
 ## Cambios de la versión 1.16.0
 

@@ -29,15 +29,15 @@ for(let i=0;i<3;i++){
    const cloth=m.garment.levels[level],positions=cloth.geometry.attributes.position.array,normals=cloth.geometry.attributes.normal.array;
    assert.ok([...positions,...normals].every(Number.isFinite));
    for(let j=0;j<positions.length;j+=3){
-    assert.ok(Math.abs(positions[j])<.7&&positions[j+1]>.90&&positions[j+1]<1.98&&Math.abs(positions[j+2])<.8,'Clothes stay on the articulated character');
-    if(cloth.rest[j+1]<.98){assert.ok(Math.hypot(positions[j]-cloth.rest[j],positions[j+1]-cloth.rest[j+1],positions[j+2]-cloth.rest[j+2])<1e-6,'Hem remains attached to the waist through a tug');}
+    assert.ok(Math.abs(positions[j])<.7&&positions[j+1]>.86&&positions[j+1]<1.98&&Math.abs(positions[j+2])<.8,'Clothes stay on the articulated character');
+    if(cloth.rest[j+1]<.98){const waist=new Vector3(cloth.rest[j],cloth.rest[j+1],cloth.rest[j+2]).applyMatrix4(m.locomotion.pelvis);assert.ok(Math.hypot(positions[j]-waist.x,positions[j+1]-waist.y,positions[j+2]-waist.z)<1e-6,'Hem remains attached to the waist through a tug');}
    }
    if(m.garment.kind==='hoodie')for(const arm of m.arms){
     const center=new Vector3();let n=0;for(let j=0;j<cloth.rest.length;j+=3)if(cloth.rest[j]*arm.s>.733){center.add(new Vector3(positions[j],positions[j+1],positions[j+2]));n++;}
     assert.ok(n>4);center.divideScalar(n);assert.ok(center.distanceTo(arm.palm.position)<.075,'Sleeve cuff follows its wrist, including the relaxed arm');
    }
    assert.ok(m.outlet.getWorldPosition(new Vector3()).distanceTo(p.anchor)<1e-8);
-   const box=new Box3().setFromObject(m.group);assert.ok(box.min.y>=-.001&&box.max.y<1.98);
+   const box=new Box3().setFromObject(m.group,true);assert.ok(box.min.y>=-.001&&box.max.y<1.98);
   }
  }
  // Camera distance drives LOD with hysteresis; each switch rebuilds projection

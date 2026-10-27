@@ -47,7 +47,8 @@ export class FittedGarment{
     this.rotation=new T.Quaternion();
   }
   setDetail(level){if(level===this.level)return;this.level=level;this.mesh.geometry=this.levels[level].geometry;this.mesh.userData.canvasVertices=null;}
-  update(body,arms,head){
+  update(body,arms,head,pelvis=null){
+    if(pelvis)this.matrices[6].copy(pelvis);
     this.matrices[0].multiplyMatrices(body.matrix,this.binds[0]);
     head.updateMatrix();this.matrices[5].multiplyMatrices(body.matrix,head.matrix).multiply(this.headBind);
     for(let a=0;a<2;a++)for(let j=0;j<2;j++){

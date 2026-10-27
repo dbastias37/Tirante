@@ -1,0 +1,15 @@
+{
+  "author": "skywarrior34niraj (https://sketchfab.com/skywarrior34niraj)",
+  "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+  "source": "https://sketchfab.com/3d-models/walk-cycle-05c7560e49c1441aa0c70d3dc7bc710b",
+  "title": "Walk Cycle",
+  "file": "walk_cycle.glb",
+  "sha256": "e8406befecb625ebd6f5a028d6affe0f05e4ad05848881c799f231aa5fd08806",
+  "animation": "Armature|Walk",
+  "sourceTriangles": 1388,
+  "sampleRate": 48,
+  "durationSeconds": 1,
+  "strideMeters": 1.025534259137872,
+  "trouserTriangles": 408,
+  "modifications": "Coordinate/scale conversion; lower-body mesh extraction and trouser fitting; weight remapping; sampled locomotion curves; adaptive pacing, foot planting and reel-arm override."
+}

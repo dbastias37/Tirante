@@ -24,3 +24,12 @@ Los dos archivos fueron aportados por el usuario para vestir a los participantes
 ## Conversión reproducible
 
 `wardrobe-manifest.json` registra SHA-256 de los dos originales y los triángulos de cada nivel. La conversión está en `scripts/assets/export_pilot_wardrobe.py`. Solo lee geometría y la imagen empaquetada; no ejecuta scripts dentro de los `.blend`. Dependencias de exportación: Python, numpy, scipy, Pillow y fast-simplification 0.1.12. No se añaden dependencias al servidor ni al navegador.
+
+## Walk Cycle
+
+- Autor: **skywarrior34niraj**, https://sketchfab.com/skywarrior34niraj
+- Obra: **Walk Cycle**, https://sketchfab.com/3d-models/walk-cycle-05c7560e49c1441aa0c70d3dc7bc710b
+- Licencia incorporada en `asset.extras` del GLB aportado: **CC BY 4.0**, https://creativecommons.org/licenses/by/4.0/
+- El GLB original aportado no se redistribuye en este repositorio. Su atribución y SHA-256 se conservan en `walk-cycle.json`.
+- Adaptaciones: conversión de escala/ejes, extracción y ajuste del pantalón continuo, pesos de piel reasignados a las piernas del jugador, ciclo muestreado a 48 Hz e interpolado, velocidad según desplazamiento, apoyo mundial del pie y brazos independientes para sostener el carrete. Se conservan las caras, ropa y zapatillas ya adaptadas.
+- Conversión reproducible: `python scripts/assets/export_pilot_walk.py /ruta/al/walk_cycle.glb`. Requiere numpy y scipy solo durante la exportación. El navegador carga unos 23 KB de datos derivados, sin cargar el GLB ni añadir bibliotecas.

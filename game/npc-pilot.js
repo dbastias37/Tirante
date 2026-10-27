@@ -6,16 +6,31 @@ const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
 // NPCs use the same controls, stamina, line and wind as the human player.
 // Decisions run at a limited cadence; they never reposition a sail directly.
 export function controlNPC(party,e,dt){
+  thinkNPC(party,e,dt);
+  advanceNPC(party,e,dt);
+}
+
+// Decision cadence is independent of physical movement: walking and the rope
+// anchor advance every physics tick, not in 8/12 Hz jumps.
+export function advanceNPC(party,e,dt){
+  const b=e.pilot,dir=e.walkDirection;if(!dir||dir.lengthSq()<1e-10||b.energy<=15)return;
+  const next=b.anchor.clone().addScaledVector(dir,.65*dt);
+  next.x=clamp(next.x,e.homeX-3,e.homeX+3);next.z=clamp(next.z,e.homeZ-12,e.homeZ+12);
+  const clear=point=>party.roster.every(other=>other===e||point.distanceTo(other.pilot.anchor)>=13);
+  if(!clear(next))next.x=b.anchor.x;
+  if(clear(next)){const distance=next.distanceTo(b.anchor);b.anchor.copy(next);b.energy=Math.max(0,b.energy-distance*.8);}
+}
+function thinkNPC(party,e,dt){
   const b=e.pilot,hard=party.difficulty==='hard';
   const climbTarget=Math.min(b.lineCapacity*.85,32),lineFloor=Math.min(b.lineCapacity*.75,28);
   if(b.lineLength<lineFloor-1)e.climbed=false;
   if(b.lineLength>=climbTarget)e.climbed=true;
   // Feeding pulses need fixed-tick timing; sampling them only on a thinking
   // tick made a 40 ms pulse last 180 ms and stalled the climb for minutes.
-  if(!e.climbed&&b.rope.contactAge>.1&&b.rope.stressRatio<.7&&b.position.y>5&&b.velocity.y>-3){climbControls(b,b.flightTime+e.phase);e.intent='Toma altura';return;}
+  if(!e.climbed&&b.rope.contactAge>.1&&b.rope.stressRatio<.7&&b.position.y>5&&b.velocity.y>-3){e.walkDirection?.set(0,0,0);climbControls(b,b.flightTime+e.phase);e.intent='Toma altura';return;}
   e.thinkIn=Math.max(0,(e.thinkIn||0)-dt);
   if(e.thinkIn>0)return;
-  const interval=hard?.08:.12;e.thinkIn=interval;
+  const interval=hard?.08:.12;e.thinkIn=interval;e.walkDirection?.set(0,0,0);
   const targets=party.roster.filter(other=>other!==e&&other.alive&&other.pilot.state==='flying');
   targets.sort((a,c)=>b.position.distanceTo(a.pilot.position)-b.position.distanceTo(c.pilot.position));
   const target=targets[0];e.targetIndex=target?.index??-1;
@@ -46,12 +61,7 @@ export function controlNPC(party,e,dt){
   }
   if(nearest&&b.energy>15){
     const delta=nearest.a.clone().sub(nearest.b);delta.y=0;
-    if(delta.length()>.04){delta.setLength(Math.min(delta.length(),.65*interval));
-      const next=b.anchor.clone().add(delta);next.x=clamp(next.x,e.homeX-3,e.homeX+3);next.z=clamp(next.z,e.homeZ-12,e.homeZ+12);
-      const clear=point=>party.roster.every(other=>other===e||point.distanceTo(other.pilot.anchor)>=13);
-      if(!clear(next))next.x=b.anchor.x;
-      if(clear(next)){b.anchor.copy(next);b.energy=Math.max(0,b.energy-delta.length()*.8);}
-    }
+    if(delta.length()>.04)e.walkDirection=delta.normalize();
   }
   // Aim the cord through an airborne point on the target's real line, then
   // carry the sail past it. Matching the rival's reel length is insufficient
