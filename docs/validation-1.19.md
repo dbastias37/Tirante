@@ -33,3 +33,10 @@ El forro aumenta la geometría pero se integra en el mismo grupo de dibujo de la
 ## Límites
 
 Los brazos actuales son una reconstrucción continua para reparar los huecos. El rostro y las manos mantienen el diseño existente hasta recibir los nuevos archivos. Los colores de zapatillas siguen horneados por vértice para compartirlos entre WebGL y Canvas; no se añadió un mapa PBR de mayor resolución ni una simulación de tela.
+
+## Verificación publicada
+
+- Implementación `2fc1c40a191f5669d51edc7c13fddfb19a75be92`, deploy Render `dep-dbgc7i7b9u1s73872tb0` en estado `live`.
+- `/healthz`: HTTP 200, versión 1.19.0. Los seis módulos de superficie, modelo, vestuario, datos, caminata y Canvas coinciden byte a byte con los archivos probados.
+- Party con tres NPC, giro de cámara, caminata, tirón y revisión lateral y desde abajo. Sin errores de la aplicación aparte del aviso esperado de WebGL no disponible en este navegador.
+- Capturas de la web: [articulaciones y calzado](tirante-1-19-party.jpg) y [capucha y mangas desde abajo](tirante-1-19-forro.jpg).
