@@ -46,3 +46,10 @@ El resultado sigue siendo estilizado. Las cabezas provienen de una figura de dib
 Incluir autor y licencia que permitan integrar y publicar los assets en el juego. Las fotografías ayudan a definir forma y postura; por sí solas no contienen geometría, UVs, pesos ni los materiales necesarios.
 
 Referencia técnica: [exportación glTF de Blender](https://docs.blender.org/manual/en/latest/addons/scene_gltf2.html), con materiales PBR y animación/esqueletos. La compatibilidad de un archivo concreto se comprueba al importarlo.
+
+## Publicación verificada
+
+- Commit de implementación: `e5574a44be7190c96b44d575ecff684c09f2a4a8`. Render lo publicó con el deploy `dep-dbgbj78473hc73fliq50`, estado `live`.
+- `/healthz` devolvió HTTP 200 y versión 1.18.0. Los seis módulos de modelo, rostro, manos, tela, vestuario y Canvas publicados coinciden byte a byte con los archivos probados.
+- Revisión real en navegador: inicio → Party con tres NPC → vistas de Mateo, Alma y Nico; soltar, recoger y tirón durante una batalla activa. Sin errores de la aplicación aparte del aviso esperado de WebGL no disponible en ese navegador.
+- [Captura de Party publicada](tirante-1-18-party.jpg), con el polerón, rostro, manos y carrete visibles.
