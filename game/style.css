@@ -363,3 +363,5 @@
 #online-settings-modal .online-settings{margin:22px 0 18px}#online-settings-done{margin-top:24px}
 
 .party-player.is-respawning{opacity:.72}.party-player.is-respawning small{color:#9a673e}.party-player b{white-space:nowrap}
+
+.flow-footer a{pointer-events:auto;color:inherit;text-underline-offset:3px}.pause-note a{color:inherit;text-underline-offset:3px}

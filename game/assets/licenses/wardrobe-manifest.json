@@ -1,0 +1,24 @@
+{
+  "sources": {
+    "shirts_tpl.blend": "e7e6cd3a70e20115dcbd9c710f122d3cb342a04d4c8d8a8396c477a2eb0caa6f",
+    "sneakers.blend": "63419a48e1d26bb8ce624ec42e1da668fdfe3330c26ada9161233ea61156f784"
+  },
+  "triangles": {
+    "tee": [
+      1999,
+      460
+    ],
+    "hoodie": [
+      2799,
+      650
+    ],
+    "sneaker": [
+      1399,
+      540
+    ],
+    "distantHeads": [
+      599,
+      600
+    ]
+  }
+}

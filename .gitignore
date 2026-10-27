@@ -5,3 +5,7 @@ data/
 !.env.example
 *.log
 .DS_Store
+
+# Offline asset conversion
+__pycache__/
+*.pyc

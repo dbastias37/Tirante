@@ -1,3 +1,7 @@
+## Ajustes 1.16 · prendas y zapatillas aportadas
+
+Las poleras, el polerón con capucha y las zapatillas proceden de las mallas aportadas por el usuario. Se ajustan y deforman sobre los participantes de la partida, con cintura estable, mangas conectadas al movimiento de brazos y capucha ligada a la mirada. La deformación es visual y no altera las fuerzas, los contactos ni las vidas. El detalle se reduce a distancia y el resultado de la animación se comparte entre WebGL y Canvas. Procedencia, adaptación, presupuestos y conversión reproducible en `REFERENCIA_PERSONAJES.md`.
+
 ## Ajustes 1.15 · hilo natural y contrincantes vestidos
 
 Se retira el arco Bézier en pantalla de 1.14. El hilo mantiene su forma física y se traslada de forma lineal desde la salida visual del carrete hasta el extremo fijo; una cuerda tensa permanece recta. La presentación no altera colisiones ni vuelve a conectar hebras cortadas. Se afina el grosor y se elimina el contorno oscuro doble de Canvas.

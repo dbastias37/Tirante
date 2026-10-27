@@ -217,7 +217,7 @@ export class Landscape {
     this.rope.visible=!onboard;this.rope.material.visible=intro;this.rope.userData.ribbon.visible=!intro&&!onboard;
     const rivalVisible=!intro&&!!this.duel?.visible,rivals=this.duel?.rivals||[this.duel?.rival];this.clashGlow.visible=rivalVisible&&this.duel.contact;
     this.rivalVisuals.forEach((visual,i)=>{const b=rivals[i],visible=rivalVisible&&!!b;visual.kite.group.visible=visible;visual.pilot.visible=visible;visual.rope.visible=visible;visual.rope.userData.fray.visible=visible;visual.rope.userData.ribbon.visible=visible;visual.rope.userData.tips.visible=visible&&b.rope.broken>=0;
-      if(visible){visual.kite.group.position.copy(b.position);visual.kite.group.quaternion.copy(b.orientation);visual.kite.animate(p.time,b.bend,b.wind.length(),b);visual.actor.update(b,p.time);this.updateTether(visual.rope,b);}
+      if(visible){visual.kite.group.position.copy(b.position);visual.kite.group.quaternion.copy(b.orientation);visual.kite.animate(p.time,b.bend,b.wind.length(),b);visual.actor.update(b,p.time,this.camera);this.updateTether(visual.rope,b);}
     });if(this.clashGlow.visible)this.clashGlow.position.copy(this.duel.contactPoint);
     this.trailView.update(!intro?this.trail:null,this.camera,p.time);
     this.sky.position.copy(this.camera.position);this.renderer.render(this.scene,this.camera);if(!intro&&!orbital&&!spectating)this.renderReel();

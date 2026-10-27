@@ -1,7 +1,11 @@
 // Depth-tested triangle drawing for the equipment preview when WebGL is absent.
 // Sorting whole faces loses the holes and narrow rims at oblique angles.
-export function rasterTriangle(target,a,b,c,rgb){
+export function rasterTriangle(target,a,b,c,rgb,rgbB=null,rgbC=null){
   const {width,height,depth,data}=target;
+  const smooth=rgbB!==null&&rgbC!==null;
+  const red0=smooth?rgb[0]-rgbC[0]:0,red1=smooth?rgbB[0]-rgbC[0]:0;
+  const green0=smooth?rgb[1]-rgbC[1]:0,green1=smooth?rgbB[1]-rgbC[1]:0;
+  const blue0=smooth?rgb[2]-rgbC[2]:0,blue1=smooth?rgbB[2]-rgbC[2]:0;
   const area=(b.y-c.y)*(a.x-c.x)+(c.x-b.x)*(a.y-c.y);
   if(Math.abs(area)<1e-8)return;
   const left=Math.max(0,Math.floor(Math.min(a.x,b.x,c.x))),right=Math.min(width-1,Math.ceil(Math.max(a.x,b.x,c.x)));
@@ -16,7 +20,9 @@ export function rasterTriangle(target,a,b,c,rgb){
       const z=c.z+w0*(a.z-c.z)+w1*(b.z-c.z);
       if(z>=depth[index])continue;
       depth[index]=z;const offset=index*4;
-      data[offset]=rgb[0];data[offset+1]=rgb[1];data[offset+2]=rgb[2];data[offset+3]=255;
+      data[offset]=smooth?rgbC[0]+w0*red0+w1*red1:rgb[0];
+      data[offset+1]=smooth?rgbC[1]+w0*green0+w1*green1:rgb[1];
+      data[offset+2]=smooth?rgbC[2]+w0*blue0+w1*blue1:rgb[2];data[offset+3]=255;
     }
   }
 }

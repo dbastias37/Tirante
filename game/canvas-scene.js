@@ -86,7 +86,7 @@ export class CanvasLandscape {
     const duel=this.duel;if(!duel?.visible)return;
     const c=this.ctx;
     for(const [i,bot] of (duel.rivals||[duel.rival]).entries()){
-    const actor=this.pilots[i];actor.update(bot,time);this.pilotCanvas.draw(c,actor,this.camera,this.width,this.height);
+    const actor=this.pilots[i];actor.update(bot,time,this.camera);this.pilotCanvas.draw(c,actor,this.camera,this.width,this.height);
     const pos=this.kitePosition.clone(),rot=this.kiteRotation.clone(),scale=this.kiteScale;
     this.kitePosition.copy(bot.position);this.kiteRotation.copy(bot.orientation);this.kiteScale=1;
     const end=this.drawKite(time,false,bot,bot.setup);

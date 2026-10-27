@@ -1,5 +1,21 @@
 # Validación de la exportación
 
+## Ropa y zapatillas aportadas · 1.16.0 · 27 de octubre de 2026
+
+- `npm run build`: 77 módulos comprobados. `npm test`: batería completa aprobada en la ejecución final. La primera batería detectó una expectativa de versión anterior en el test de salud del servidor; se actualizó a 1.16.0. Los diez tests HTTP/SQLite pasan, incluida la entrega de la geometría nueva, los créditos y la licencia original.
+- `pilot-model` y `pilot-wardrobe`: proporciones humanas, posiciones/normales finitas, salida del carrete en el anclaje físico, animación detenida al pausar, colores de suela y empeine, dos niveles de detalle y cambio de caché de proyección. Se ejercitan 72 combinaciones de personaje, postura y detalle: recoger/soltar, tensión, tirón, cambio de rumbo y eliminación. El borde inferior permanece en la cintura y los puños del polerón se mantienen a menos de 7,5 cm de las muñecas.
+- Canvas interpola la iluminación y los colores de vértice. La regresión de profundidad prueba que una cara posterior no tapa la anterior y conserva la independencia del orden de dibujo. Tres buffers reutilizables de 64×96, 128×192 y 192×288 evitan rasterizar a máxima resolución a los jugadores pequeños.
+- Inspección local de vistas frontal, lateral y posterior de las dos prendas, los dos pies y posturas con carga y eliminación. Se corrigieron las intersecciones iniciales en hombros/cintura y se dio espacio detrás de la capucha para el cráneo.
+
+| Personaje | Triángulos cerca | Triángulos lejos | Grupos de dibujo |
+| --- | ---: | ---: | ---: |
+| Mateo | 10.708 | 4.856 | 20 |
+| Alma | 9.966 | 5.022 | 21 |
+| Nico | 11.076 | 4.614 | 16 |
+
+Microprueba CPU aislada: 120 fotogramas tras 20 de calentamiento, un NPC a 18 m, Node 24.22.1. Actualización, proyección y rasterización: 3,97 ms por fotograma con 1.15 y 2,63 ms con 1.16 y su buffer adaptado a la altura proyectada. No son FPS del juego ni mediciones de una GPU.
+
+
 ## Hilo natural y contrincantes vestidos · 1.15.0 · 26 de octubre de 2026
 
 - `npm run build`: 74 módulos comprobados. `npm test`: batería completa aprobada, incluidas diez pruebas del servidor. Tras agrupar piezas estáticas del personaje se repitió `pilot-model` y el build; tras ajustar el cambio de cámara de espectador se repitió `game-flow` y el build.
