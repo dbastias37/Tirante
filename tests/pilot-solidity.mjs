@@ -38,6 +38,23 @@ for(let index=0;index<3;index++){
     for(let pose=0;pose<9;pose++){
       const t=1+poses*.07;p.position.set(Math.sin(pose)*12,pose%3===0?2:pose%3===1?16:65,-25);p.action=['hold','reel','release'][pose%3];p.lastTug=t-.12;p.eliminated=pose===8;p.state=pose===8?'cut':'flying';m.update(p,t);poses++;
       for(const arm of m.arms)probeTube(arm.surface.surface,[5,6,7,11,12]);probeTube(m.neckSurface.surface,[1,2,3]);
+      // Probe the actual head/neck union, including the area above the old
+      // neck cap that was exposed from below at a steep upward look.
+      for(const y of [.035,.060,.085])for(let k=0;k<12;k++){
+        const angle=(k+.31)/12*Math.PI*2,center=V(0,y,-.01).applyMatrix4(m.head.matrixWorld),out=V(Math.cos(angle),0,Math.sin(angle)).transformDirection(m.head.matrixWorld);
+        const hits=new Raycaster(center.clone().addScaledVector(out,.22),out.clone().negate(),0,.22).intersectObjects([m.face,m.neck],false);
+        assert.ok(hits.length,`The jaw/neck union is filled at height ${y}, angle ${k}, pilot ${index}, detail ${level}`);
+      }
+      for(const x of [-.0213,.0037,.0191]){
+        const origin=V(x,-.025,.0093).applyMatrix4(m.head.matrixWorld),up=V(0,1,0).transformDirection(m.head.matrixWorld);
+        assert.ok(new Raycaster(origin,up,0,.060).intersectObject(m.face,false).length,`The cut head has a skin cap below its throat: pilot ${index}, detail ${level}, pose ${pose}, x ${x}`);
+      }
+      // From outside the chest, the cloth must cover its solid inner body.
+      for(const y of [.28,.35,.42])for(const s of [-1,1]){
+        const origin=V(s*.6,y,0).applyMatrix4(m.body.matrixWorld),direction=V(-s,0,0).transformDirection(m.body.matrixWorld);
+        const hits=new Raycaster(origin,direction,0,.7).intersectObjects([m.garment.mesh,m.underbody],false);
+        assert.ok(hits.length&&hits[0].object===m.garment.mesh,`Cloth covers the torso at ${y}, side ${s}, pilot ${index}, pose ${pose}`);
+      }
       assert.ok(m.outlet.getWorldPosition(V()).distanceTo(p.anchor)<1e-8);
       for(const part of m.parts){const {position,normal}=part.geometry.attributes;assert.equal(position.count,normal.count);assert.ok(position.array.every(Number.isFinite)&&normal.array.every(Number.isFinite));}
     }

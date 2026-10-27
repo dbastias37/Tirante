@@ -4,7 +4,7 @@ import {PilotHand} from './pilot-hands.js';
 import {PilotArmSurface,PilotNeckSurface} from './pilot-surface.js';
 import {PILOT_KIT} from './pilot-kit-data.js';
 import {pilotTextureMaterial} from './pilot-textures.js';
-import {FittedGarment,wardrobeGeometry,PILOT_WARDROBE} from './pilot-wardrobe.js';
+import {FittedGarment,wardrobeGeometry} from './pilot-wardrobe.js';
 
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),UP=V(0,1,0);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -82,6 +82,7 @@ export class PilotModel{
     const kitHead=PILOT_KIT.heads[index%3];
     this.faceSkin=pilotTextureMaterial(kitHead.texture);
     this.headLevels=kitHead.levels.map(source=>({geometry:wardrobeGeometry(source)}));
+    this.neckSurface.fitHead(this.headLevels[0].geometry);
     this.face=add(this.head,this.headLevels[0].geometry,this.faceSkin);this.face.name='kit-head';
     this.locomotion=new PilotLocomotion();this.trousers=new PilotTrousers(this.pants);this.hips=this.trousers.mesh;this.group.add(this.hips);
     this.arms=[];this.legs=[];
@@ -91,7 +92,7 @@ export class PilotModel{
       const hand=new PilotHand(s,this.skin),palm=hand.group;this.group.add(palm);this.arms.push({s,upper,lower,cuff,palm,hand,surface});
       const thigh=new T.Object3D(),shin=new T.Object3D();this.group.add(thigh,shin);
       const shoeGroup=new T.Group();this.group.add(shoeGroup);
-      const shoeLevels=PILOT_KIT.shoe.levels.map(source=>wardrobeGeometry(source,s));
+      const shoeLevels=PILOT_KIT.shoe.levels.map(source=>wardrobeGeometry(source,-s));
       const sneaker=add(shoeGroup,shoeLevels[0],pilotTextureMaterial(PILOT_KIT.shoe.texture));sneaker.name='sneaker';
       const sock=add(shoeGroup,new T.CylinderGeometry(.028,.032,.11,12),this.pants,V(0,.135,0));sock.name='ankle-cuff';
       const solePoints=[];for(const g of shoeLevels)for(let i=0;i<g.attributes.position.count;i++){const v=V().fromBufferAttribute(g.attributes.position,i);solePoints.push(v);}
@@ -131,13 +132,16 @@ export class PilotModel{
     const reelRate=inactive||p.action==='hold'?0:(p.action==='reel'?1:-1)*(p.boost?8:4);this.spool.rotation.x+=dt*reelRate;
     for(const arm of this.arms){
       const s=arm.s,a=V(s*.185,.465,0).applyMatrix4(this.body.matrix),working=p.action!=='hold'&&!inactive;
-      const b=s>0?V(.16,1.24,-.325):inactive?V(-.22,1.01,-.13):V(p.action==='release'?-.14:-.12,1.13+(working?Math.sin(this.spool.rotation.x)*.012:0)+tug*.02,-.405+(working?Math.cos(this.spool.rotation.x)*.012:0)+tug*.015);
-      const e=elbow(a,b,V(s*.6,.95,.02));segment(arm.upper,a,e);segment(arm.lower,e,b);
+      const b=s>0?V(.16,1.24,-.325):inactive?V(-.22,1.01,-.13):V(p.action==='release'?-.124:-.114,1.18+(working?Math.sin(this.spool.rotation.x)*.006:0)+tug*.008,-.34+(working?Math.cos(this.spool.rotation.x)*.006:0)+tug*.006);
+      const e=elbow(a,b,V(s*.17,.95,-.12));segment(arm.upper,a,e);segment(arm.lower,e,b);
       const wrist=b.clone().lerp(e,.12);segment(arm.cuff,wrist,b);
       arm.palm.position.copy(b);
-      if(s<0&&!inactive)arm.palm.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(V(0,0,1),V(-1,0,0),V(0,-1,0)));
-      else arm.palm.rotation.set(s<0?-.45:0,0,s<0?-.12:0);
-      arm.hand.pose(s>0?.95:inactive?.15:p.action==='release'?.12:p.action==='reel'?.40:.20,dt);
+      if(s<0){
+        const forward=b.clone().sub(e);if(!inactive)forward.x=0;forward.normalize();const z=forward.negate(),y=V(-1,0,0);y.addScaledVector(z,-y.dot(z)).normalize();const x=y.clone().cross(z).normalize();
+        arm.palm.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(x,y,z));
+      }
+      else arm.palm.rotation.set(0,0,0);
+      arm.hand.pose(s>0?.95:inactive?.15:p.action==='release'?.025:p.action==='reel'?.12:.065,dt);
       arm.surface.update(a,e,b,arm.palm,this.garment.kind!=='tee');
     }
     for(let i=0;i<this.legs.length;i++){

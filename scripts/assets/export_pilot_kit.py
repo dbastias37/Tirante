@@ -6,7 +6,7 @@ import sys,io,json,struct,hashlib
 from pathlib import Path
 import numpy as np
 from scipy.spatial import cKDTree
-from PIL import Image
+from PIL import Image,ImageDraw,ImageFilter
 import fast_simplification
 from blend_reader import Blend
 ROOT=Path(__file__).resolve().parents[2]
@@ -93,6 +93,41 @@ def clip_bottom(v,f,uv,mi,height):
    ids=[0,k,k+1];faces.append([poly[j][0] for j in ids]);coords.append([poly[j][1] for j in ids]);materials.append(mat)
  return np.array(vertices),np.array(faces),np.array(coords),np.array(materials)
 
+def close_throat(v,f,uv,mi,height):
+ # The kit's cut bust is open. A real skin cap blocks views up into the
+ # mouth cavity when the head pitches, even before the neck overlaps it.
+ edges={}
+ for face,tex,mat in zip(f,uv,mi):
+  if mat!=0:continue
+  for k in range(3):
+   a,c=int(face[k]),int(face[(k+1)%3]);key=tuple(sorted((a,c)))
+   if key in edges:del edges[key]
+   else:edges[key]=(a,c,tex[k])
+ border=[e for e in edges.values() if max(v[e[0],1],v[e[1],1])<.080]
+ if not border:return v,f,uv,mi
+ ids=np.unique([[a,c] for a,c,_ in border]);center=len(v);v=np.vstack([v,v[ids].mean(0)])
+ sample=max(border,key=lambda e:v[e[0],2])[2]
+ f=np.vstack([f,[[c,a,center] for a,c,_ in border]]);uv=np.concatenate([uv,np.tile(sample,(len(border),3,1))]);mi=np.r_[mi,np.zeros(len(border),dtype=int)]
+ return v,f,uv,mi
+
+def scalp_underlay(tile,v,f,uv,lo,size):
+ # Hair cards retain their transparency, over a matching scalp rather than
+ # bald skin. This UV bake adds no runtime mesh or draw call.
+ mask=Image.new('L',tile.size,0);draw=ImageDraw.Draw(mask)
+ def threshold(p):
+  back=np.clip((p[2]+.025)/.070,0,1);back=back*back*(3-2*back)
+  temple=np.clip((abs(p[0])-.040)/.040,0,1);temple=temple*temple*(3-2*temple)
+  return p[1]-(.184+.010*np.exp(-(p[0]/.04)**2)-.064*back-.032*temple)
+ for face,tex in zip(f,uv):
+  poly=[]
+  for k in range(3):
+   a,c=v[face[k]],v[face[(k+1)%3]];qa,qc=tex[k],tex[(k+1)%3];fa,fc=threshold(a),threshold(c)
+   if fa>=0:poly.append(qa)
+   if (fa>=0)!=(fc>=0):poly.append(qa+(qc-qa)*fa/(fa-fc))
+  if len(poly)>2:
+   q=(np.array(poly)-lo)/size;draw.polygon([(float(u*(tile.width-1)),float((1-w)*(tile.height-1))) for u,w in q],fill=255)
+ mask=mask.filter(ImageFilter.GaussianBlur(.65));dark=Image.new('RGBA',tile.size,(56,35,25,255));return Image.composite(dark,tile,mask)
+
 def export(name,tag,kind):
  v,f,uv,mi,mats=source(name)
  if kind=='head':
@@ -100,11 +135,17 @@ def export(name,tag,kind):
   # remains the game's continuous animated neck, overlapped inside the jaw.
   keep=np.array([not ('teeth' in mats[i].lower() or 'tongue' in mats[i].lower()) for i in mi])
   f,uv,mi=f[keep],uv[keep],mi[keep]
-  v,f,uv,mi=clip_bottom(v,f,uv,mi,-.074)
-  v=np.stack([v[:,0]*.88,(v[:,1]+.112)*.88,-(v[:,2]+.075)*.88],1)
-  t=np.clip((.09-v[:,1])/.055,0,1);t=t*t*(3-2*t)
-  v[:,0]=v[:,0]*(1-t)+np.clip(v[:,0],-.045,.045)*t
-  v[:,2]=v[:,2]*(1-t)+np.clip(v[:,2],-.034,.058)*t
+  v,f,uv,mi=clip_bottom(v,f,uv,mi,-.107)
+  neck_ids=np.unique(f[mi==0]);neck_ids=neck_ids[abs(v[neck_ids,1]+.107)<1e-6];neck_center=v[neck_ids].mean(0)
+  v=np.stack([(v[:,0]-neck_center[0])*.88,(v[:,1]+.112)*.88,-(v[:,2]-neck_center[2])*.88+.012],1)
+  # Preserve the chin/jaw in front of the neck. Only the posterior neck and
+  # the very bottom of the discarded bust blend into the animated neck tube.
+  t=np.clip((.067-v[:,1])/.057,0,1);t=t*t*(3-2*t)
+  front=np.clip((v[:,2]+.075)/.040,0,1);front=front*front*(3-2*front);t*=front
+  angle=np.arctan2(v[:,2]-.012,v[:,0])
+  v[:,0]=v[:,0]*(1-t)+np.cos(angle)*.046*t
+  v[:,2]=v[:,2]*(1-t)+(.012+np.sin(angle)*.044)*t
+  v,f,uv,mi=close_throat(v,f,uv,mi,(.112-.107)*.88)
   budgets=[{'skin':2200,'eye':320,'hair':650},{'skin':650,'eye':120,'hair':200}]
  else:
   # Shoe source has toe along -Z after Blender's object rotation.
@@ -119,7 +160,9 @@ def export(name,tag,kind):
   size=np.maximum(hi-lo,.001);crop=(int(lo[0]*image.width),int((1-hi[1])*image.height),int(np.ceil(hi[0]*image.width)),int(np.ceil((1-lo[1])*image.height)))
   if 'eye_brown' in mats[i].lower():
    rgba=np.array(image);red=(rgba[:,:,0]>rgba[:,:,1]*1.35)&(rgba[:,:,0]<170);rgba[red,0]=(rgba[red,0]*.68).astype('uint8');image=Image.fromarray(rgba)
-  tile=image.crop(crop).resize((508,508),Image.Resampling.LANCZOS);x=(slot%2)*512+2;y=(slot//2)*512+2;atlas.paste(tile,(x,y));regions[i]=(lo,size,x,y)
+  tile=image.crop(crop).resize((508,508),Image.Resampling.LANCZOS)
+  if name=='make5' and i==0:tile=scalp_underlay(tile,v,f[mi==i],uv[mi==i],lo,size)
+  x=(slot%2)*512+2;y=(slot//2)*512+2;atlas.paste(tile,(x,y));regions[i]=(lo,size,x,y)
  path=ROOT/'game/assets/pilots';path.mkdir(exist_ok=True)
  atlas.save(path/(tag+'.webp'),quality=88,method=6)
  pixels=np.asarray(atlas)
@@ -131,7 +174,10 @@ def export(name,tag,kind):
    usedverts,inv=np.unique(ff,return_inverse=True);vv=v[usedverts];fflocal=inv.reshape(-1,3)
    pp,ii=fast_simplification.simplify(vv,fflocal,target_count=min(budget.get(label,400),len(ff)),agg=5)
    # Keep QEM's reduced surface within the source silhouette.
-   pp=np.clip(pp,vv.min(0),vv.max(0));nn=mesh_normals(pp,ii);tri=pp[ii];directions=np.cross(tri[:,1]-tri[:,0],tri[:,2]-tri[:,0]);directions/=np.maximum(np.linalg.norm(directions,axis=1)[:,None],1e-20)
+   pp=np.clip(pp,vv.min(0),vv.max(0));nn=mesh_normals(pp,ii)
+   if kind=='head' and label=='skin':
+    blend=np.clip((.065-pp[:,1])/.030,0,1);radial=np.stack([pp[:,0],np.zeros(len(pp)),pp[:,2]-.012],1);radial/=np.maximum(np.linalg.norm(radial,axis=1)[:,None],1e-12);nn=nn*(1-blend[:,None])+radial*blend[:,None];nn/=np.maximum(np.linalg.norm(nn,axis=1)[:,None],1e-12)
+   tri=pp[ii];directions=np.cross(tri[:,1]-tri[:,0],tri[:,2]-tri[:,0]);directions/=np.maximum(np.linalg.norm(directions,axis=1)[:,None],1e-20)
    sample=tri.reshape(-1,3)
    q=chart_uv(sample,np.repeat(directions,3,axis=0),v,ff,uu)
    lo,size,x,y=regions[i];q=np.clip((q-lo)/size,0,1);qx=(x+q[:,0]*507+.5)/1024;qy=1-(y+(1-q[:,1])*507+.5)/1024;q=np.stack([qx,qy],1)
@@ -166,4 +212,4 @@ def sweater():
 heads=[export('make3','mateo-face','head'),export('make5','alma-face','head'),export('make1','nico-face','head')]
 shoe=export('make6.001','sport-shoe','shoe')
 (ROOT/'game/pilot-kit-data.js').write_text('// Adapted from the user-supplied clothing and character kit. Source files stay offline.\nexport const PILOT_KIT='+json.dumps(dict(heads=heads,shoe=shoe,sweater=sweater()),separators=(',',':'))+';\n')
-(ROOT/'game/assets/licenses/character-kit.json').write_text(json.dumps(dict(sourceName=Path(sys.argv[1]).name,sha256=hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest(),sourceLicense='No explicit license or author credit embedded in the supplied file. User supplied for this game.',heads=['make3','make5','make1'],shoe='make6.001',sweater='low_poly_shirt.001_Retopo_Mesh_Plane.001',adaptations=['Bust removed; fitted to continuous game neck','Two geometry detail levels','Original UV islands retained in cropped texture atlases','Invisible teeth and tongue omitted','Sweater rest pose fitted to the game shoulders and forearms','Sports shoes fitted to existing planted-foot animation']),indent=2)+'\n')
+(ROOT/'game/assets/licenses/character-kit.json').write_text(json.dumps(dict(sourceName=Path(sys.argv[1]).name,sha256=hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest(),sourceLicense='No explicit license or author credit embedded in the supplied file. User supplied for this game.',heads=['make3','make5','make1'],shoe='make6.001',sweater='low_poly_shirt.001_Retopo_Mesh_Plane.001',adaptations=['Each head registered to its own neck center; original chin and jaw retained', 'Lower throat opening closed after deformation; normals blended at the neck', 'Two geometry detail levels', 'Original UV islands retained in cropped texture atlases; scalp underlay beneath hair cards', 'Invisible teeth and tongue omitted', 'Sweater rest pose fitted to the game shoulders and forearms', 'Anatomical left sports shoe mirrored for the right foot; existing planted-foot animation retained']),indent=2)+'\n')

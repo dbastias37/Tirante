@@ -10,11 +10,12 @@
   "shoe": "make6.001",
   "sweater": "low_poly_shirt.001_Retopo_Mesh_Plane.001",
   "adaptations": [
-    "Bust removed; fitted to continuous game neck",
+    "Each head registered to its own neck center; original chin and jaw retained",
+    "Lower throat opening closed after deformation; normals blended at the neck",
     "Two geometry detail levels",
-    "Original UV islands retained in cropped texture atlases",
+    "Original UV islands retained in cropped texture atlases; scalp underlay beneath hair cards",
     "Invisible teeth and tongue omitted",
     "Sweater rest pose fitted to the game shoulders and forearms",
-    "Sports shoes fitted to existing planted-foot animation"
+    "Anatomical left sports shoe mirrored for the right foot; existing planted-foot animation retained"
   ]
 }

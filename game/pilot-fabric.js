@@ -2,18 +2,45 @@ import * as T from './vendor/three.module.js';
 const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
 const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a));return t*t*(3-2*t);};
 
+// Relax irregular triangulation once, keeping neck, cuff and hem boundaries.
+// This removes sharp inherited ridges before fitting the cloth to the rig.
+function relaxCloth(g){
+ const p=g.attributes.position,neighbors=Array.from({length:p.count},()=>new Set()),edges=new Map(),fixed=new Set();
+ for(let k=0;k<g.index.count;k+=3)for(let j=0;j<3;j++){
+  const a=g.index.getX(k+j),b=g.index.getX(k+(j+1)%3),key=[Math.min(a,b),Math.max(a,b)].join(',');neighbors[a].add(b);neighbors[b].add(a);edges.set(key,(edges.get(key)||0)+1);
+ }
+ for(const [edge,n] of edges)if(n===1)for(const id of edge.split(','))fixed.add(Number(id));
+ for(const amount of [.38,-.34,.38,-.34,.24,.24]){
+  const next=p.array.slice();
+  for(let i=0;i<p.count;i++)if(!fixed.has(i)&&neighbors[i].size){
+   for(let axis=0;axis<3;axis++){let sum=0;for(const j of neighbors[i])sum+=p.array[j*3+axis];const shoulder=smooth(.10,.18,Math.abs(p.getX(i)))*(1-smooth(.28,.36,Math.abs(p.getX(i))))*smooth(1.30,1.40,p.getY(i))*(1-smooth(1.50,1.54,p.getY(i)));next[i*3+axis]+=(sum/neighbors[i].size-p.array[i*3+axis])*amount*(amount===.24?shoulder:1);}
+  }
+  p.array.set(next);
+ }
+}
+const interpolate=(x,points)=>{for(let i=1;i<points.length;i++)if(x<points[i][0]){const [a,av]=points[i-1],[b,bv]=points[i];return av+(bv-av)*clamp((x-a)/(b-a));}return points.at(-1)[1];};
+
 // Small silhouette folds and sewn details are part of the same weighted mesh.
 // No texture downloads, per-frame cloth simulation or extra draw calls.
 export function finishFabric(g,kind,level){
-  const p=g.attributes.position,c=g.attributes.color;
+  relaxCloth(g);const p=g.attributes.position,c=g.attributes.color;
   for(let i=0;i<p.count;i++){
-    let x=p.getX(i),y=p.getY(i),z=p.getZ(i);const arm=smooth(.16,.25,Math.abs(x))*(1-smooth(1.48,1.53,y));
-    y+=(y-1.425)*arm*(kind==='tee'?.19:.06);z+=(z+.015)*arm*(kind==='tee'?.22:.07);
-    if(kind==='hoodie'){const cuff=smooth(.60,.745,Math.abs(x));y=1.425+(y-1.425)*(1-.32*cuff);z=-.015+(z+.015)*(1-.32*cuff);}
+    let x=p.getX(i),y=p.getY(i),z=p.getZ(i);const distance=Math.abs(x),arm=smooth(.215,.29,distance)*(1-smooth(1.49,1.55,y));
+    if(arm){
+      const centerY=kind==='tee'?1.423:kind==='sweater'?1.402:1.410,centerZ=interpolate(distance,[[.24,0],[.4,-.008],[.6,-.012],[.75,-.018]]);
+      const ry=kind==='tee'?.064:interpolate(distance,[[.28,kind==='hoodie'?.070:.064],[.48,.057],[.60,.047],[.75,kind==='hoodie'?.038:.034]]);
+      const rz=kind==='tee'?.060:ry*.88,dy=(y-centerY)/ry,dz=(z-centerZ)/rz,r=Math.hypot(dy,dz)||1;
+      const ease=.90+.10*clamp(r,.7,1.3),fitY=1.425+dy/r*ry*ease,fitZ=dz/r*rz*ease;
+      y+=(fitY-y)*arm;z+=(fitZ-z)*arm;
+    }
+    // The shoulder slopes from the collar toward the sleeve; retain the hood
+    // and collar boundaries instead of flattening them into a padded ledge.
+    const shoulder=smooth(.11,.21,distance)*(1-smooth(.24,.30,distance))*smooth(1.43,1.49,y)*(1-smooth(1.53,1.57,y));
+    y-=.015*shoulder;
     const lower=(1-smooth(1.16,1.34,y))*smooth(.95,1.02,y)*(1-smooth(.12,.20,Math.abs(x)));
-    const fold=Math.sin(y*59+x*33)*.0033+Math.sin(y*97-x*19)*.0014;
+    const fold=Math.sin(x*38+.4)*.0024+Math.sin((y-.98)*55)*.0010;
     z+=Math.sign(z||1)*fold*lower;p.setXYZ(i,x,y,z);
-    const shade=1-.065*lower*(.5+.5*Math.sin(y*59+x*33))-.025*Math.sin(x*91+y*83)**2;
+    const shade=1-.025*lower*(.5+.5*Math.sin(x*38+.4))-.012*Math.sin(x*91+y*83)**2;
     c.setXYZ(i,c.getX(i)*shade,c.getY(i)*shade,c.getZ(i)*shade);
   }
   g.computeVertexNormals();

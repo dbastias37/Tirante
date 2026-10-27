@@ -35,6 +35,10 @@ for(let index=0;index<3;index++){
     support.hand.curl=null;guide.hand.curl=null;
     for(const action of ['hold','release','reel'])for(let step=0;step<12;step++){
       const time=1+poses*.02;p.action=action;p.lastTug=time-.12;p.rope.stressRatio=step/12;m.update(p,time);poses++;
+      for(const arm of m.arms){
+        const forearm=V(0,1,0).applyQuaternion(arm.lower.quaternion),fingers=V(0,0,-1).applyQuaternion(arm.palm.quaternion);
+        assert.ok(forearm.dot(fingers)>Math.cos(38*Math.PI/180),'The wrist continues the forearm instead of bending sideways at 90 degrees');
+      }
       assert.ok(support.palm.position.distanceTo(hold)<1e-10,'The supporting hand stays on the fixed axle while the spool turns');
       assert.ok(m.outlet.getWorldPosition(V()).distanceTo(p.anchor)<1e-8,'Appearance changes cannot move the physical line anchor');
       for(const part of m.parts){

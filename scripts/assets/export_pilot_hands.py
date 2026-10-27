@@ -19,8 +19,8 @@ bones={b.field(d,'Bone','name'):d for d in b.records('Bone')}
 ordered=['Hand_R','TwistTh_R','ThumbIn_R','ThumbOut_R']+[digit+part+'_R' for digit in ['Index','Long','Ring','Pink'] for part in ['In','Mid','Out']]
 origin=np.array(b.field(bones['Hand_R'],'Bone','arm_head'))
 def fit(p):
- q=np.array(p)-origin;return np.stack([q[...,2]*.085,-q[...,0]*.10,q[...,1]*.11],axis=-1)
-v=fit(v);f=f[:,[0,2,1]]
+ q=np.array(p)-origin;return np.stack([-q[...,2]*.085,-q[...,0]*.10,q[...,1]*.11],axis=-1)
+v=fit(v)
 weights=np.zeros((len(v),len(ordered)))
 for i,d in enumerate(b.rows(b.field(m,'Mesh','dvert'),'MDeformVert')):
  for w in b.rows(b.field(d,'MDeformVert','dw'),'MDeformWeight'):
@@ -55,4 +55,4 @@ for name in ordered:
  d=bones[name];parent=b.field(d,'Bone','parent');parentname=b.field(b.addresses[parent]['data'],'Bone','name') if parent else ''
  rig.append(dict(name=name.removesuffix('_R'),head=np.round(fit(b.field(d,'Bone','arm_head')),6).tolist(),parent=ordered.index(parentname) if parentname in ordered else 0))
 (ROOT/'game/pilot-hand-data.js').write_text('// Derived mesh/weights from user-provided HandSwap, Axel (EAFG). No source texture supplied.\nexport const PILOT_HAND='+json.dumps(dict(levels=levels,rig=rig),separators=(',',':'))+';\n')
-(ROOT/'game/assets/licenses/handswap.json').write_text(json.dumps(dict(sourceName=Path(sys.argv[1]).name,author='Axel (EAFG), from embedded model notes',sha256=hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest(),sourceLicense='No explicit license text embedded. User supplied for this game.',texture='Not supplied; author explicitly excludes original skin texture. Game uses its own skin material.',adaptations=['One fitted hand, mirrored for the other side','Original mesh and finger deformation weights','Game-specific reel grip; no punch animation or editor constraints','Closed wrist and two detail levels']),indent=2)+'\n')
+(ROOT/'game/assets/licenses/handswap.json').write_text(json.dumps(dict(sourceName=Path(sys.argv[1]).name,author='Axel (EAFG), from embedded model notes',sha256=hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest(),sourceLicense='No explicit license text embedded. User supplied for this game.',texture='Not supplied; author explicitly excludes original skin texture. Game uses its own skin material.',adaptations=['Right hand coordinate basis corrected without anatomical inversion; mirrored for the left hand', 'Original mesh and finger deformation weights', 'Guide fingers aligned with the forearm; support hand surrounds the fixed reel axle', 'Game-specific reel grip; no punch animation or editor constraints', 'Closed wrist and two detail levels']),indent=2)+'\n')

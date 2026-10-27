@@ -20,6 +20,11 @@ for(let i=0;i<3;i++){
  const p=new KitePhysics(),m=new PilotModel(i);p.launch();p.anchor.set(i*18,1.35,0);
  assert.equal(m.garment.kind,['sweater','tee','hoodie'][i]);
  for(const level of m.garment.levels)for(let j=0;j<level.weights.length;j+=3){assert.ok(Math.abs(level.weights[j]+level.weights[j+1]+level.weights[j+2]-1)<1e-6);}
+ for(const leg of m.legs)for(const g of leg.shoeLevels){
+   const v=g.attributes.position;let front=Infinity;for(let j=0;j<v.count;j++)front=Math.min(front,v.getZ(j));let x=0,count=0;
+   for(let j=0;j<v.count;j++)if(v.getZ(j)<front+.02){x+=v.getX(j);count++;}
+   assert.ok(x/count*leg.s<-.005,'The longer medial toe belongs on the inside of its foot, not the opposite shoe');
+ }
  // A free arm after elimination, reeling, strong pulls and changing heading
  // exercise the actual game rig, rather than a static asset preview.
  for(let pose=0;pose<12;pose++){

@@ -30,7 +30,7 @@ export class PilotHand{
    const {name,head,parent}=PILOT_HAND.rig[i],matrix=this.matrices[i];matrix.identity();if(!i)continue;
    const angle=name.includes('Thumb')?-.42*curl:name==='TwistTh'?-.25*curl:name.includes('In')?-.70*curl:name.includes('Mid')?-1.05*curl:-.82*curl;
    this.local.makeTranslation(...head).multiply(this.shift.makeRotationX(angle));
-   if(name==='TwistTh')this.local.multiply(this.shift.makeRotationY(.70*curl));
+   if(name==='TwistTh')this.local.multiply(this.shift.makeRotationY(-.70*curl));
    this.local.multiply(this.shift.makeTranslation(-head[0],-head[1],-head[2]));matrix.multiplyMatrices(this.matrices[parent],this.local);
   }
   const {geometry:g,rest,bones,weights}=this.levels[this.level],out=g.attributes.position.array;

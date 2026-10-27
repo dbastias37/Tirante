@@ -5,8 +5,9 @@
   "sourceLicense": "No explicit license text embedded. User supplied for this game.",
   "texture": "Not supplied; author explicitly excludes original skin texture. Game uses its own skin material.",
   "adaptations": [
-    "One fitted hand, mirrored for the other side",
+    "Right hand coordinate basis corrected without anatomical inversion; mirrored for the left hand",
     "Original mesh and finger deformation weights",
+    "Guide fingers aligned with the forearm; support hand surrounds the fixed reel axle",
     "Game-specific reel grip; no punch animation or editor constraints",
     "Closed wrist and two detail levels"
   ]

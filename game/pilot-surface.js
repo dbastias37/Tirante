@@ -48,11 +48,37 @@ export class PilotArmSurface{
 }
 
 export class PilotNeckSurface{
-  constructor(material){this.surface=new SkinTube(5,16,material,'continuous-neck');this.mesh=this.surface.mesh;}
+  constructor(material){
+    this.baseColor=material.color.clone();const skin=material.clone();skin.color.set(0xffffff);skin.vertexColors=true;
+    this.surface=new SkinTube(5,16,skin,'continuous-neck');this.mesh=this.surface.mesh;this.inverse=new T.Matrix4();this.point=V();
+    this.mesh.geometry.setAttribute('color',new T.Float32BufferAttribute(new Float32Array(this.mesh.geometry.attributes.position.count*3),3));
+  }
+  fitHead(g){
+    const p=g.attributes.position,c=g.attributes.color,uv=g.attributes.uv;this.palette=[];
+    for(let k=0;k<16;k++){
+      const angle=k/16*Math.PI*2,candidates=[];
+      for(let i=0;i<p.count;i++)if(p.getY(i)<.075&&uv.getX(i)<.5&&uv.getY(i)>.5){
+        const direction=Math.atan2(p.getZ(i)-.012,p.getX(i)),delta=Math.atan2(Math.sin(direction-angle),Math.cos(direction-angle));
+        candidates.push({i,score:delta*delta*.001+(p.getY(i)-.030)**2});
+      }
+      candidates.sort((a,b)=>a.score-b.score);const color=new T.Color(0,0,0);let sum=0;
+      for(const {i,score} of candidates.slice(0,4)){const w=1/(score+.00001);color.r+=c.getX(i)*w;color.g+=c.getY(i)*w;color.b+=c.getZ(i)*w;sum+=w;}
+      this.palette.push(sum?color.multiplyScalar(1/sum):this.baseColor.clone());
+    }
+  }
   update(head){
-    head.updateMatrix();const top=V(0,.045,.012).applyMatrix4(head.matrix),base=V(0,.445,0);
-    const centers=[base,V(0,.485,0),V(0,.530,0),V(0,.010,.008).applyMatrix4(head.matrix),top];
-    this.surface.update(centers,[[.070,.062],[.060,.055],[.049,.047],[.046,.044],[.047,.047]]);
+    head.updateMatrix();const base=V(0,.445,0);
+    // The imported neck opening is centered on this endpoint and capped;
+    // overlap inside it without extending a cylinder across the jaw.
+    const centers=[base,V(0,.485,0),V(0,.530,0),V(0,.010,.008).applyMatrix4(head.matrix),V(0,.055,.012).applyMatrix4(head.matrix)];
+    this.surface.update(centers,[[.070,.062],[.060,.055],[.049,.047],[.045,.043],[.043,.042]]);
+    const {position,color}=this.mesh.geometry.attributes;this.inverse.copy(head.matrix).invert();
+    for(let i=0;i<position.count;i++){
+      const p=this.point.fromBufferAttribute(position,i).applyMatrix4(this.inverse),t=T.MathUtils.smoothstep(p.y,-.050,.025),angle=(Math.atan2(p.z-.012,p.x)+Math.PI*2)%(Math.PI*2)/Math.PI*8,at=Math.floor(angle),blend=angle-at;
+      const a=this.palette?.[at]||this.baseColor,b=this.palette?.[(at+1)%16]||a;
+      color.setXYZ(i,this.baseColor.r+(a.r+(b.r-a.r)*blend-this.baseColor.r)*t,this.baseColor.g+(a.g+(b.g-a.g)*blend-this.baseColor.g)*t,this.baseColor.b+(a.b+(b.b-a.b)*blend-this.baseColor.b)*t);
+    }
+    color.needsUpdate=true;
   }
 }
 
