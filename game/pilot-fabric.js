@@ -10,7 +10,7 @@ function relaxCloth(g){
   const a=g.index.getX(k+j),b=g.index.getX(k+(j+1)%3),key=[Math.min(a,b),Math.max(a,b)].join(',');neighbors[a].add(b);neighbors[b].add(a);edges.set(key,(edges.get(key)||0)+1);
  }
  for(const [edge,n] of edges)if(n===1)for(const id of edge.split(','))fixed.add(Number(id));
- for(const amount of [.38,-.34,.38,-.34,.24,.24]){
+ for(const amount of [.38,-.34,.38,-.34,.34,-.30,.24,.24]){
   const next=p.array.slice();
   for(let i=0;i<p.count;i++)if(!fixed.has(i)&&neighbors[i].size){
    for(let axis=0;axis<3;axis++){let sum=0;for(const j of neighbors[i])sum+=p.array[j*3+axis];const shoulder=smooth(.10,.18,Math.abs(p.getX(i)))*(1-smooth(.28,.36,Math.abs(p.getX(i))))*smooth(1.30,1.40,p.getY(i))*(1-smooth(1.50,1.54,p.getY(i)));next[i*3+axis]+=(sum/neighbors[i].size-p.array[i*3+axis])*amount*(amount===.24?shoulder:1);}
@@ -38,7 +38,7 @@ export function finishFabric(g,kind,level){
     const shoulder=smooth(.11,.21,distance)*(1-smooth(.24,.30,distance))*smooth(1.43,1.49,y)*(1-smooth(1.53,1.57,y));
     y-=.015*shoulder;
     const lower=(1-smooth(1.16,1.34,y))*smooth(.95,1.02,y)*(1-smooth(.12,.20,Math.abs(x)));
-    const fold=Math.sin(x*38+.4)*.0024+Math.sin((y-.98)*55)*.0010;
+    const fold=Math.sin(x*38+.4)*.0012+Math.sin((y-.98)*55)*.0005;
     z+=Math.sign(z||1)*fold*lower;p.setXYZ(i,x,y,z);
     const shade=1-.025*lower*(.5+.5*Math.sin(x*38+.4))-.012*Math.sin(x*91+y*83)**2;
     c.setXYZ(i,c.getX(i)*shade,c.getY(i)*shade,c.getZ(i)*shade);
@@ -53,18 +53,18 @@ export function finishFabric(g,kind,level){
     }return Number.isFinite(z)?z:-.105;
   };
   const vertex=(x,y,shade,depth=.002)=>{const at=vertices.length/3;vertices.push(x,y,front(x,y)-depth);colors.push(shade,shade,shade);return at;};
-  const stroke=(points,width,shade,depth=.003)=>{
+  const stroke=(points,width,shade,depth=.0009)=>{
     for(let k=0;k<points.length-1;k++){const a=points[k],b=points[k+1],length=Math.hypot(b[0]-a[0],b[1]-a[1])||1,nx=-(b[1]-a[1])/length*width/2,ny=(b[0]-a[0])/length*width/2;
       const ids=[[a[0]+nx,a[1]+ny],[b[0]+nx,b[1]+ny],[b[0]-nx,b[1]-ny],[a[0]-nx,a[1]-ny]].map(q=>vertex(...q,shade,depth));indices.push(ids[0],ids[1],ids[2],ids[0],ids[2],ids[3]);}
   };
   // The hem and chest details remain subdued in the chosen team colour.
-  const hem=Array.from({length:level?7:15},(_,i)=>[-.13+i/(level?6:14)*.26,.972]);stroke(hem,.0016,.64);
+  const hem=Array.from({length:level?7:15},(_,i)=>[-.13+i/(level?6:14)*.26,.972]);stroke(hem,.0012,.86);
   if(kind==='tee'){
     const pocket=[[.047,1.337],[.112,1.337],[.112,1.270],[.080,1.254],[.047,1.270],[.047,1.337]];
     stroke(pocket,.0014,.69);stroke([[.047,1.335],[.112,1.335]],.004,.84,.0035);
   }else if(kind==='hoodie'){
     const pocket=[[-.105,1.073],[-.075,1.151],[.075,1.151],[.105,1.073],[.092,1.033],[-.092,1.033],[-.105,1.073]];
-    stroke(pocket,.0022,.67);stroke([[-.105,1.073],[-.075,1.151]],.006,.58,.004);stroke([[.075,1.151],[.105,1.073]],.006,.58,.004);
+    stroke(pocket,.0015,.86);stroke([[-.105,1.073],[-.075,1.151]],.004,.80,.0012);stroke([[.075,1.151],[.105,1.073]],.004,.80,.0012);
     for(const s of [-1,1])stroke([[s*.027,1.465],[s*.031,1.412],[s*.024,1.365]],.0032,.45,.005);
   }
   // Turn the exposed cloth boundary into a narrow rolled edge (neck/cuffs).

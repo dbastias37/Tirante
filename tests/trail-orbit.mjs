@@ -12,9 +12,10 @@ const p=new KitePhysics({...DEFAULT_SETUP,left:40,color:'teal'});p.profile='gust
 trail.state='playing';p.position.copy(trail.points[7]);trail.previous.copy(p.position);trail.step(dt);assert.equal(trail.index,0);
 p.position.copy(trail.points[0]);trail.previous.copy(p.position);trail.step(dt);assert.equal(trail.index,1);assert.ok(trail.remaining>91);
 trail.start();assert.equal(trail.index,0);assert.equal(trail.remaining,90);assert.equal(trail.result,null);
-// Shorter releases compensate for the faster turn response; the route, pickup
-// radius and win/medal requirements remain unchanged.
-const sequence=[['hold',5],['release',.42],['hold',3],['release',.42],['hold',3],['release',.42],['hold',3],['release',.42],['hold',3],['reel',1],['hold',3],['release',.42],['hold',3],['release',.75],['hold',3],['reel',1.5],['hold',3]];
+// Short releases control the turn. Retrieval lasts 5/7 as long at the new
+// 1.75 m/s speed, with the saved time spent holding. Route and medals unchanged.
+const retrieveScale=5/7;
+const sequence=[['hold',5],['release',.42],['hold',3],['release',.42],['hold',3],['release',.42],['hold',3],['release',.42],['hold',3],['reel',retrieveScale],['hold',4-retrieveScale],['release',.42],['hold',3],['release',.75],['hold',3],['reel',1.5*retrieveScale],['hold',4.5-1.5*retrieveScale]];
 for(const [action,seconds]of sequence){p.setControls(action,false);for(let i=0;i<seconds/dt&&trail.active;i++){p.step(dt);solveRopeSystem([p.rope],dt);trail.step(dt);}}
 assert.equal(trail.result?.won,true,'The published route is reachable with real Q/E maneuvers, no position edits or autopilot');assert.equal(trail.index,8);assert.equal(trail.result.medal,'Oro');assert.ok(trail.elapsed<=30,'The gold medal matches the measured course time');const completed=trail.elapsed;trail.step(20);assert.equal(trail.elapsed,completed);
 trail.stop();assert.deepEqual(p.setup,saved);assert.equal(p.windSpeed,8);assert.equal(p.profile,'gusts');assert.equal(p.lineCapacity,100);

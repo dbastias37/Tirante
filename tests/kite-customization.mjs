@@ -1,3 +1,4 @@
+import {bridlePoint} from '../game/bridle.js';
 import assert from 'node:assert/strict';
 import {KitePhysics,DEFAULT_SETUP,configuration} from '../game/physics.js';
 import {bridleAnchors,bowHeight,sailZ,SPAR_OFFSET,BRIDLE_OFFSET} from '../game/kite-shape.js';
@@ -26,8 +27,8 @@ for(const [l,r] of [[0,0],[95,95],[10,85]]){
   visual.animate(time,bend,wind);
   const anchors=bridleAnchors(setup,time,bend,wind);
   for(const spar of [visual.spine,visual.bow]){const p=spar.geometry.attributes.position;for(let i=0;i<p.count;i++){near(p.getZ(i)-sailZ(p.getX(i),p.getY(i),time,bend,wind),SPAR_OFFSET);assert.ok(SPAR_OFFSET<0);}}
-  visual.strings.forEach((s,i)=>{const p=s.geometry.attributes.position;near(p.getX(0),anchors[i][0]);near(p.getY(0),anchors[i][1]);near(p.getZ(0)-sailZ(p.getX(0),p.getY(0),time,bend,wind),BRIDLE_OFFSET);assert.ok(p.getZ(1)>0);if(i<2)near(p.getY(0),bowHeight(p.getX(0)));});
-  for(const knot of visual.knots.children){const a=anchors[knot.userData.anchor],t=knot.userData.t;near(knot.position.x,a[0]+(visual.junction.x-a[0])*t);near(knot.position.z,a[2]+(visual.junction.z-a[2])*t);}
+  visual.strings.forEach((s,i)=>{const p=s.geometry.attributes.position;near(p.getX(0),anchors[i][0]);near(p.getY(0),anchors[i][1]);near(p.getZ(0)-sailZ(p.getX(0),p.getY(0),time,bend,wind),BRIDLE_OFFSET);assert.ok(p.getZ(p.count-1)>0);if(i<2)near(p.getY(0),bowHeight(p.getX(0)));});
+  for(const knot of visual.knots.children){const q=bridlePoint(visual.bridleSimulation.chains[knot.userData.anchor].local,knot.userData.t);near(knot.position.x,q.x);near(knot.position.z,q.z);}
  }
 }
 for(const panel of visual.panels){const p=panel.geometry.attributes.position,uv=panel.geometry.attributes.uv;assert.equal(uv.count,p.count);for(let i=0;i<uv.count;i++){near(uv.getX(i),(p.getX(i)+.4)/.8);near(uv.getY(i),(p.getY(i)+.4)/.8);}}

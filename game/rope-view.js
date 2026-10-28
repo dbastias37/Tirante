@@ -1,10 +1,10 @@
 import {Vector3} from './vendor/three.module.js';
 export const LOOSE_SUBDIVISIONS=3;
 export function displayStrands(rope,points=rope.points,cache=[]){
-  if(rope.broken<0)return {points,broken:-1};
-  let at=0,broken=-1;
+  if(rope.broken<0)return {points,broken:-1,sourceEdges:points.sourceEdges};
+  let at=0,broken=-1;const cut=points.broken??rope.broken;
   const put=q=>(cache[at++]||=new Vector3()).copy(q);
-  for(const [start,end]of [[0,rope.broken],[rope.broken+1,points.length-1]]){
+  for(const [start,end]of [[0,cut],[cut+1,points.length-1]]){
     if(start>0)broken=at-1;
     put(points[start]);
     for(let i=start;i<end;i++){

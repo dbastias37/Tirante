@@ -4,7 +4,7 @@ import {WEAR_STEP,WEAR_SAMPLES} from './line-config.js';
 import {LINE_STRENGTH} from './line-stress.js';
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const V=()=>new Vector3();
-export const ROPE_SEGMENTS=28,CONTACT_RADIUS=.008;
+export const ROPE_SEGMENTS=28,CONTACT_RADIUS=.00035;
 export const ROPE_DRAW_SEGMENTS=320;
 
 // Finite 3-D segments. Parameters refer to the material's two mesh edges.
@@ -26,7 +26,7 @@ export class Tether {
     this.points=Array.from({length:n+1},(_,i)=>p.anchor.clone().lerp(end,i/n));
     this.previous=this.points.map(q=>q.clone());this.velocities=this.points.map(V);this.weights=this.points.map((_,i)=>i===0||i===n?0:1);
     this.rest=Array(n).fill(p.lineLength/n);this.lambda=Array(n).fill(0);this.wear=new Float64Array(WEAR_SAMPLES);this.broken=-1;this.breakPoint=null;
-    this.contactLoad=0;this.contactEdge=-1;this.feedDelta=0;this.lastLength=p.lineLength;this.integrity=100;this.contactAge=100;this.breakAge=100;
+    this.contactLoad=0;this.contactEdge=-1;this.handContact=false;this.contactMinEdge=-1;this.feedDelta=0;this.lastLength=p.lineLength;this.integrity=100;this.contactAge=100;this.breakAge=100;
     this.stressLoad=0;this.strength=p.equipment?.thread.strength||LINE_STRENGTH;this.stressRatio=0;this.overload=0;this.jamStrain=0;this.jamTime=0;this.shock=0;this.cutReason='';
   }
   moveAnchor(position){
@@ -43,8 +43,8 @@ export class Tether {
         const a=x[i],b=x[i+1],dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z,len=Math.hypot(dx,dy,dz);if(len<1e-9)continue;
         const delta=(-(len-this.rest[i])-alpha*this.lambda[i])/(w[i]+w[i+1]+alpha);
         // A loose thread can pull, but cannot push its neighbours apart like
-        // a rod. Compression disappears after a cut, including on the ground.
-        const next=this.broken>=0?Math.min(0,this.lambda[i]+delta):this.lambda[i]+delta;
+        // a rod. Compression is absent in intact and detached thread alike.
+        const next=Math.min(0,this.lambda[i]+delta);
         const change=next-this.lambda[i];this.lambda[i]=next;
         const f=change/len;a.x-=w[i]*f*dx;a.y-=w[i]*f*dy;a.z-=w[i]*f*dz;b.x+=w[i+1]*f*dx;b.y+=w[i+1]*f*dy;b.z+=w[i+1]*f*dz;
       }
@@ -70,8 +70,12 @@ export class Tether {
   // Bend at a collision changes both the loaded path and force direction.
   loadPath(end,direction){
     if(this.contactEdge<0||this.broken>=0)return end.distanceTo(this.owner.anchor);
-    direction.subVectors(end,this.contactPoint).normalize();
-    return this.owner.anchor.distanceTo(this.contactPoint)+this.contactPoint.distanceTo(end);
+    // Use the complete loaded chain: several crossings cannot be represented
+    // by a single strongest bend that jumps between opponents.
+    const tip=this.endpoint(),n=this.points.length;let length=0,last=this.owner.anchor;
+    for(let i=1;i<n-1;i++){length+=last.distanceTo(this.points[i]);last=this.points[i];}
+    direction.subVectors(tip,last).normalize();
+    return length+last.distanceTo(tip);
   }
   materialAt(edge,fraction){return Math.max(0,this.owner.lineLength*(1-(edge+fraction)/ROPE_SEGMENTS));}
   wearAt(edge,fraction=.5){return this.wear[Math.min(this.wear.length-1,Math.round(this.materialAt(edge,fraction)/WEAR_STEP))]||0;}
@@ -93,7 +97,7 @@ export class Tether {
     const recoil=Math.min(3,.7+this.owner.tension*.3);
     this.velocities.splice(edge+1,0,velocity.clone().addScaledVector(dir,-recoil),velocity.clone().addScaledVector(dir,recoil));
     this.weights.splice(edge+1,0,1,1);this.rest.splice(edge,1,rest*fraction,0,rest*(1-fraction));this.lambda=Array(this.rest.length).fill(0);
-    this.broken=edge+1;this.breakPoint=point;this.breakAge=0;this.contactEdge=-1;this.contactLoad=0;this.integrity=0;
+    this.broken=edge+1;this.breakPoint=point;this.breakAge=0;this.contactEdge=-1;this.contactLoad=0;this.handContact=false;this.contactMinEdge=-1;this.integrity=0;
     this.refineLooseStrands();
   }
   refineLooseStrands(){

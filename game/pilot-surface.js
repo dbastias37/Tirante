@@ -67,10 +67,10 @@ export class PilotNeckSurface{
     }
   }
   update(head){
-    head.updateMatrix();const base=V(0,.445,0);
+    head.updateMatrix();const base=V(0,.435,0);
     // The imported neck opening is centered on this endpoint and capped;
     // overlap inside it without extending a cylinder across the jaw.
-    const centers=[base,V(0,.485,0),V(0,.530,0),V(0,.010,.008).applyMatrix4(head.matrix),V(0,.055,.012).applyMatrix4(head.matrix)];
+    const centers=[base,V(0,.465,0),V(0,.490,0),V(0,.010,.008).applyMatrix4(head.matrix),V(0,.055,.012).applyMatrix4(head.matrix)];
     this.surface.update(centers,[[.070,.062],[.060,.055],[.049,.047],[.045,.043],[.043,.042]]);
     const {position,color}=this.mesh.geometry.attributes;this.inverse.copy(head.matrix).invert();
     for(let i=0;i<position.count;i++){

@@ -11,7 +11,7 @@ for(let i=0;i<3;i++){
  const bounds=new Box3().setFromObject(m.group);assert.ok(bounds.min.y>=-.001&&bounds.max.y<1.95);assert.ok(bounds.max.y-bounds.min.y>1.6);
  const actual=m.outlet.getWorldPosition(new Vector3());assert.ok(actual.distanceTo(p.anchor)<1e-8,'The visible reel outlet is the actual rope anchor');
  for(const part of m.parts){assert.ok([...part.geometry.attributes.position.array].every(Number.isFinite));assert.ok([...part.geometry.attributes.normal.array].every(Number.isFinite));}
- const shoulder=m.arms[1].upper.position.clone(),hand=m.arms[0].palm.position.clone();p.setControls('reel',true);m.update(p,1.1);assert.ok(m.spool.rotation.x!==0);assert.ok(m.arms[0].palm.position.distanceTo(hand)>.001);
+ const shoulder=m.arms[1].upper.position.clone(),hand=m.arms[0].palm.position.clone();p.setControls('reel',true);for(let step=0;step<24;step++)p.step(1/240);m.update(p,1.1);assert.ok(m.spool.rotation.x!==0);assert.ok(m.arms[0].palm.position.distanceTo(hand)>.001);
  const spin=m.spool.rotation.x,cloth=m.garment.mesh.geometry.attributes.position.array.slice();m.update(p,1.1);assert.equal(m.spool.rotation.x,spin,'Pausing cannot advance animation');assert.deepEqual(m.garment.mesh.geometry.attributes.position.array,cloth,'Clothing stops with simulation time');
  p.lastTug=1.1;m.update(p,1.2);assert.ok(m.arms[1].upper.position.distanceTo(shoulder)>.001,'Tug shifts the upper body');
  const before=m.legs[0].shoe.position.clone();p.anchor.x+=.08;m.update(p,1.3);assert.ok(m.legs[0].shoe.position.distanceTo(before)>.001,'Footwork follows real movement');

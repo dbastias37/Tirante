@@ -46,11 +46,11 @@ assert.ok(FIELD_SIZE/2>MAX_LINE_CAPACITY);assert.ok(CAMERA_FAR>MAX_LINE_CAPACITY
 for(const anchors of [[0,95],[95,0],[30,30],[55,80]]){
  const p=new KitePhysics({...DEFAULT_SETUP,anchorLeft:anchors[0],anchorRight:anchors[1],knotsLeft:2,knotsRight:4,lower:57});p.launch();p.heading=1.3;p.updateAttitude(new Vector3(.2,0,-1).normalize());p.rope.pin();
  const kite=new PaperKite();kite.configure(p.setup);kite.group.position.copy(p.position);kite.group.quaternion.copy(p.orientation);kite.group.updateMatrixWorld();const joint=kite.group.localToWorld(kite.junction.clone());assert.ok(joint.distanceTo(p.rope.points.at(-1))<1e-10,'Main line meets the common three-bridle knot');
- for(const string of kite.strings){const end=new Vector3().fromBufferAttribute(string.geometry.attributes.position,1);assert.ok(end.distanceTo(kite.junction)<1e-7);}
+ for(const string of kite.strings){const end=new Vector3().fromBufferAttribute(string.geometry.attributes.position,string.geometry.attributes.position.count-1);assert.ok(end.distanceTo(kite.junction)<1e-7);}
  // The first-person representation may blend only near the reel; the kite and
  // cut free strand stay on their physical points, in any camera direction.
  const camera=new PerspectiveCamera(54,16/9,.15,4000);camera.position.set(0,1.72,1.1);camera.lookAt(p.position);const raw=p.rope.points.map(q=>q.clone()),outlet={x:900,y:850},drawn=foregroundLine(p.rope,camera,1000,900,outlet);
  const projected=drawn[0].clone().project(camera);assert.ok(Math.abs((projected.x*.5+.5)*1000-outlet.x)<1e-7);assert.ok(Math.abs((.5-projected.y*.5)*900-outlet.y)<1e-7);assert.ok(drawn.at(-1).distanceTo(joint)<1e-10);assert.ok(raw.every((q,i)=>q.equals(p.rope.points[i])));
- p.cutLine(5,.5);const cut=foregroundLine(p.rope,camera,1000,900,outlet);for(let i=p.rope.broken+1;i<cut.length;i++)assert.ok(cut[i].equals(p.rope.points[i]),'Presentation cannot reconnect a cut');
+ p.cutLine(5,.5);const cut=foregroundLine(p.rope,camera,1000,900,outlet);for(let i=p.rope.broken+1;i<p.rope.points.length;i++)assert.ok(cut[i+((cut.broken??p.rope.broken)-p.rope.broken)].equals(p.rope.points[i]),'Presentation cannot reconnect a cut');
 }
 console.log(`PASS: 72 payout/catch cases, peak ${peak.toFixed(2)} m/s, max stretch ${excursion.toFixed(2)} m; 300/1000 yd wear, full-length stability, exact bridle junction, foreground connection and corrupted-record recovery.`);

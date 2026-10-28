@@ -1,3 +1,4 @@
+import {applyCrossingAbrasion} from './line-stress.js';
 import {solveRopeSystem} from './rope-system.js';
 import {mixSeed} from './line-stress.js';
 import {Commission} from './commission.js';
@@ -80,16 +81,12 @@ export class PartyCommission extends Commission{
         if(!strongest.has(e)||strongest.get(e).load<contact.load)strongest.set(e,{load:contact.load,point:contact.point.clone(),edge});
         e.hit={edge,fraction};e.cutBy=other.name;
       }
-      if(a.pilot.tension>.08&&b.pilot.tension>.08){
-        const fa=a.stroke.factor(this.elapsed),fb=b.stroke.factor(this.elapsed),work=.36*contact.load*contact.slip*Math.max(fa,fb);
-        const pa=Math.abs(a.pilot.rope.feedDelta)*fa,pb=Math.abs(b.pilot.rope.feedDelta)*fb,total=pa+pb;
-        a.pilot.rope.abrade(hit.i,hit.s,work*(.2+.8*(total?pb/total:0)));b.pilot.rope.abrade(hit.j,hit.t,work*(.2+.8*(total?pa/total:0)));
-      }
+      applyCrossingAbrasion(a.pilot.rope,b.pilot.rope,hit,contact,dt,a.stroke.factor(this.elapsed),b.stroke.factor(this.elapsed));
       if(i===0&&(!focus||contact.load>focus.contact.load))focus={hit,contact,entry:b};
     }
-    // Every crossing deforms the strands. The strongest supplies the reduced
-    // flight body's force path on the next step, rather than the last pair.
-    for(const [e,h]of strongest){const r=e.pilot.rope;r.contactEdge=h.edge;r.contactAge=0;r.contactPoint.copy(h.point);r.contactLoad=h.load;}
+    // Keep a stable marker for the strongest surviving contact; the flight
+    // force follows the entire rope polyline, including all other crossings.
+    for(const [e,h]of strongest){const r=e.pilot.rope;if(r.broken>=0)continue;r.contactEdge=h.edge;r.contactAge=0;r.contactPoint.copy(h.point);r.contactLoad=h.load;}
     if(focus){this.contact=true;this.contactTime+=dt;this.rival=focus.entry.pilot;this.rivalStroke=focus.entry.stroke;this.lastHit=focus.hit;this.contactPoint.copy(focus.contact.point);this.pressure=focus.contact.load;this.sliding=focus.contact.slip/dt;}
     this.reversals=this.playerStroke.reversals;
     for(const e of this.roster)if(e.alive&&e.pilot.rope.integrity<=0)this.eliminate(e,'Hilo cortado',e.cutBy);

@@ -45,7 +45,7 @@ assert.equal(state.back(),'menu');state.go('settings');assert.equal(state.back()
 
 assert.ok(Math.abs(toYards(150)-164.041994750656)<1e-10);assert.equal(distanceText(65),'71,1 yd (65,0 m)');assert.match(distanceHTML(150),/164,0.*yd.*<small[^>]*>\(150,0 m\)<\/small>/);
 const select={options:[{value:'150'}]};populateCapacities(select);assert.equal(select.options[0].value,'150');assert.equal(select.options[0].textContent,'164,0 yd (150,0 m)');
-for(const [w,h]of[[1363,936],[1920,1080],[390,844],[360,640],[844,390],[568,320]]){const b=reelViewport(w,h);assert.ok(b.x>=0&&b.y>=0&&b.x<w&&b.y<h,`Reel stays visible at ${w}×${h}`);assert.ok(b.x+b.size>w,'Foreground reel enters from the right edge');}
+for(const [w,h]of[[1363,936],[1920,1080],[390,844],[360,640],[844,390],[568,320]]){const b=reelViewport(w,h);assert.ok(b.x>=0&&b.y>=0&&b.x<w&&b.y<h,`Reel stays visible at ${w}×${h}`);assert.ok(Math.abs(b.x+b.size/2-w/2)<1,'Foreground reel is horizontally centered');assert.ok(b.y+b.size*.82<h-80,'Reel clears the bottom controls');}
 
 const landscape=Object.create(Landscape.prototype);landscape.scene=new Scene();landscape.createLandscape();const ground=landscape.scene.children.find(m=>m.geometry?.parameters?.width===FIELD_SIZE),surround=landscape.scene.children.find(m=>m.userData.groundSurround);assert.ok(ground&&surround);ground.updateMatrixWorld();surround.updateMatrixWorld();
 for(const [x,z]of[[.13,.27],[21.23,70.16],[110.15,-145.31],[180.13,249.71],[1001.31,-1181.75],[1220.13,30.27],[-1501.1,1402.3]]){const ray=new Raycaster(new Vector3(x,100,z),new Vector3(0,-1,0)),hits=ray.intersectObjects([ground,surround]);assert.equal(hits.length,1,`Exactly one ground surface at ${x},${z}`);}

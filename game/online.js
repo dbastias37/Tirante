@@ -1,5 +1,5 @@
 import {distanceText} from './units.js';
-import {guardRopeMotion} from './rope-system.js';
+import {guardRopeMotion,currentRopeContacts} from './rope-system.js';
 import {Vector3} from './vendor/three.module.js';
 const $=id=>document.getElementById(id), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const SESSION='tirante.online.v1';
@@ -94,7 +94,7 @@ export class OnlineGame{
       while(view.rope.points.length<r.points.length)view.rope.points.push(new Vector3());view.rope.points.length=r.points.length;
       r.points.forEach((v,i)=>{const prev=canLerp?a.rope.points[i]:v;view.rope.points[i].set(prev[0]+(v[0]-prev[0])*t-offset[0],prev[1]+(v[1]-prev[1])*t,prev[2]+(v[2]-prev[2])*t-offset[2]);});
       view.rope.previous=sameLife&&this.viewRound===d.round&&previous.length===view.rope.points.length?previous:view.rope.points.map(p=>p.clone());
-      for(const key of ['broken','breakAge','contactEdge','contactAge','contactLoad','integrity','stressLoad','strength','stressRatio','jamTime','cutReason'])view.rope[key]=r[key];
+      for(const key of ['broken','breakAge','handContact','contactMinEdge','contactEdge','contactAge','contactLoad','integrity','stressLoad','strength','stressRatio','jamTime','cutReason'])view.rope[key]=r[key];
       view.rope.contactPoint.fromArray(r.contactPoint).sub(new Vector3(offset[0],0,offset[2]));view.rope.breakPoint=r.breakPoint?new Vector3().fromArray(r.breakPoint).sub(new Vector3(offset[0],0,offset[2])):null;
       if(fresh){view.rope.wear.fill(0);for(const [i,n] of r.wear)view.rope.wear[i]=n;}
     }
@@ -106,6 +106,17 @@ export class OnlineGame{
     for(const key of ['state','elapsed','remaining','contact','pressure','sliding','reversals','engagements'])duel[key]=m[key];
     duel.playerHealth=own?m.rivalHealth:m.playerHealth;duel.rivalHealth=own?m.playerHealth:m.rivalHealth;duel.contactPoint.fromArray(m.contactPoint).sub(new Vector3(offset[0],0,offset[2]));
     duel.lastHit=m.lastHit?(own?{i:m.lastHit.j,j:m.lastHit.i,s:m.lastHit.t,t:m.lastHit.s}:m.lastHit):null;
+    // Contact labels use the visible, accepted rope geometry. Snapshot ages
+    // and camera interpolation cannot leave a marker floating between strands.
+    const renderedContacts=currentRopeContacts([p.rope,duel.rival.rope]);
+    for(const r of [p.rope,duel.rival.rope]){r.contactMinEdge=-1;r.handContact=false;}
+    for(const c of renderedContacts)for(const [r,edge]of [[c.ra,c.i],[c.rb,c.j]]){r.contactMinEdge=r.contactMinEdge<0?edge:Math.min(r.contactMinEdge,edge);if(edge===0)r.handContact=true;}
+    const touching=renderedContacts.find(c=>c.a!==c.b);
+    duel.contact=!!touching&&!!m.contact;
+    if(duel.contact){
+      const a=p.rope.points[touching.i].clone().lerp(p.rope.points[touching.i+1],touching.s),b=duel.rival.rope.points[touching.j].clone().lerp(duel.rival.rope.points[touching.j+1],touching.t);
+      duel.contactPoint.copy(a).lerp(b,.5);p.rope.contactPoint.copy(a);duel.rival.rope.contactPoint.copy(b);p.rope.contactEdge=touching.i;duel.rival.rope.contactEdge=touching.j;
+    }else {duel.pressure=0;duel.sliding=0;p.rope.contactEdge=-1;duel.rival.rope.contactEdge=-1;}
     duel.message=d.paused?'Esperando reconexión · reloj detenido':m.message.replaceAll('hilo azul','hilo rival');
     duel.result=m.result?{...m.result,outcome:own?{win:'loss',loss:'win',draw:'draw'}[m.result.outcome]:m.result.outcome,playerHealth:Math.round(duel.playerHealth),rivalHealth:Math.round(duel.rivalHealth),playerLives:p.lives,rivalLives:duel.rival.lives}:null;
     if(own&&duel.result)duel.result.reason=({'El rival agotó sus 3 vidas.':'Agotaste tus 3 vidas.','Agotaste tus 3 vidas.':'El rival agotó sus 3 vidas.'})[duel.result.reason]||duel.result.reason;

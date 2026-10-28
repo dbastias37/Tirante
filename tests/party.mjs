@@ -3,7 +3,7 @@ import {Vector3,Quaternion,PerspectiveCamera} from '../game/vendor/three.module.
 import {KitePhysics} from '../game/physics.js';
 import {climbControls,LAUNCH_SECONDS} from '../game/battle-rules.js';
 import {PartyCommission} from '../game/party.js';
-import {Tether} from '../game/rope.js';
+import {Tether,CONTACT_RADIUS} from '../game/rope.js';
 import {frameDuel,positionView,handViewOffset,PILOT_EYE} from '../game/duel-camera.js';
 const dt=1/240,v=(x=0,y=0,z=0)=>new Vector3(x,y,z);
 function party(count=3){const p=new KitePhysics(),d=new PartyCommission(p);d.startParty(count);return d;}
@@ -21,7 +21,7 @@ for(let i=0;i<4;i++)for(let j=i+1;j<4;j++){
  const d=party();d.state='playing';d.elapsed=5;d.roster.forEach((e,n)=>e.alive=n===i||n===j);const a=d.roster[i],b=d.roster[j];fixture(a,v(-2,5,0),v(2,5,0));fixture(b,v(0,5,-2),v(0,5,2));
  const beforeA=a.pilot.rope.points.map(p=>p.clone()),beforeB=b.pilot.rope.points.map(p=>p.clone());d.resolveContacts(dt);
  assert.equal(d.contacts.length,1);assert.equal(d.contact,i===0,'NPC-only collisions do not pretend the player is touching');assert.equal(a.pilot.rope.integrity,100,'Static contact does not abrade');assert.equal(b.pilot.rope.integrity,100);
- assert.ok(a.pilot.rope.points.some((p,n)=>p.distanceTo(beforeA[n])>.001));assert.ok(b.pilot.rope.points.some((p,n)=>p.distanceTo(beforeB[n])>.001));
+ assert.ok(a.pilot.rope.points.some((p,n)=>p.distanceTo(beforeA[n])>CONTACT_RADIUS*.5));assert.ok(b.pilot.rope.points.some((p,n)=>p.distanceTo(beforeB[n])>CONTACT_RADIUS*.5));
  // Repeated physical strokes under load wear this pair, independent of others.
  for(let n=0;n<180;n++){for(const e of [a,b]){const points=e.pilot.rope.points;for(let k=0;k<points.length;k++)points[k].copy(e.pilot.anchor).lerp(e.pilot.position.clone().add(v(0,-.06,.23)),k/(points.length-1));e.pilot.rope.previous=points.map(p=>p.clone());}a.pilot.rope.feedDelta=Math.floor(n/30)%2?.015:-.015;b.pilot.rope.feedDelta=0;d.elapsed+=dt;d.resolveContacts(dt);}
  assert.ok(b.pilot.rope.integrity<99,'Sawing wears a physical NPC/NPC or player/NPC crossing');

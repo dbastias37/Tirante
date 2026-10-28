@@ -21,7 +21,7 @@ function expose(rope,load,strength,dt,limit=.03){
 export function updateWindStress(p,dt){
   const r=p.rope;if(r.broken>=0||p.state!=='flying'||r.contactAge<.1)return;
   r.jamStrain*=Math.exp(-dt*5);r.jamTime=0;
-  const edge=Math.min(27,Math.max(0,Math.floor(8+mixSeed(p.flightSeed)%15))),strength=remainingStrength(r,edge);
+  const edge=Math.min(27,Math.max(0,Math.floor(8+mixSeed(p.flightSeed)%15))),strength=remainingStrength(r,edge)*1.25;
   const failed=expose(r,p.tension,strength,dt);
   // No spontaneous failures in gentle air or during the launch impulse.
   if(failed&&p.flightTime>3&&p.windSpeed>=8&&p.wind.length()>=9.8)p.cutLine(edge,.5,'wind');
@@ -65,4 +65,17 @@ export function resolveLineStress(ropes,contacts,dt){
     if(tied)tied[0].owner.cutLine(tied[1].edge,tied[1].fraction,'tension');
     else {released.add(c.other);c.other.overload=0;c.other.jamStrain*=.25;}
   }
+}
+
+// Abrasion is work at a verified crossing, not a random cut or a UI overlap.
+// A fast continuous retrieve is an attack too; it need not reverse direction.
+export function applyCrossingAbrasion(a,b,hit,contact,dt,fa=.08,fb=.08){
+  if(a.broken>=0||b.broken>=0||a.owner.tension<=.08||b.owner.tension<=.08)return;
+  const sliding=contact.slip/Math.max(dt,1e-6),technique=Math.max(fa,fb,Math.min(1,sliding/2.5));
+  const work=.9*contact.load*contact.slip*technique;
+  const pa=Math.abs(a.feedDelta)*Math.max(fa,Math.min(1,Math.abs(a.feedDelta)/dt/2.5)),pb=Math.abs(b.feedDelta)*Math.max(fb,Math.min(1,Math.abs(b.feedDelta)/dt/2.5)),total=pa+pb;
+  const failedA=a.abrade(hit.i,hit.s,work*(.2+.8*(total?pb/total:0)));
+  const failedB=b.abrade(hit.j,hit.t,work*(.2+.8*(total?pa/total:0)));
+  if(failedA)a.owner.cutLine(hit.i,hit.s,'abrasion');
+  if(failedB)b.owner.cutLine(hit.j,hit.t,'abrasion');
 }

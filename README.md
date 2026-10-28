@@ -1,6 +1,6 @@
 # TIRANTE · El pulso del viento
 
-Simulador de volantines, versión 1.21.0, publicado desde este repositorio en Render.
+Simulador de volantines, versión 1.22.0, publicado desde este repositorio en Render.
 
 ## Instalación actual en Render
 
@@ -22,6 +22,16 @@ La instalación actual usa el plan gratuito, una instancia y `DATA_DIR=/tmp/tira
 - Party local contra 1–3 NPC, Rastro de luz contrarreloj y duelo online para dos personas.
 - Interfaz compacta para móvil, renderer WebGL y alternativa Canvas.
 - Servidor Node.js, base SQLite, almacenamiento de estampados y pruebas automatizadas.
+
+## Cambios de la versión 1.22.0
+
+- Cuello 6,5 cm más corto; mangas con una curva continua alrededor del codo, forro reajustado y relieves del polerón más suaves.
+- Los cruces se calculan sobre los mismos tramos que se dibujan. La unión de primera persona se limita a la salida del carrete y se desactiva si ese tramo está en contacto. El indicador se actualiza con la geometría final, también online.
+- Respuesta local en cada cruce: permite deslizar sin congelar un grupo completo de hilos. El hilo soporta tensión pero no empuja como una varilla; la fuerza del volantín sigue el recorrido completo en enredos múltiples.
+- Tirantes articulados, con gravedad, viento y extremos fijos al papel y al nudo común. Borde exterior de papel tenue; se conservan solo los dos palillos centrales.
+- Recogida base de 1,75 m/s, menor frenado en cruces y 25% más margen frente al viento. La fricción rápida continua puede cortar un hilo, sin exigir alternar botones; la tensión excesiva sigue pudiendo cortar el propio.
+- Carrete centrado en primera persona y giro vinculado al hilo que entra o sale. Los menús se mantienen para la próxima etapa.
+- [Validación, parámetros y límites](docs/validation-1.22.md).
 
 ## Cambios de la versión 1.21.0
 

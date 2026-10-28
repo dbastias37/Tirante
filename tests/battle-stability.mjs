@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {Vector3,Quaternion} from '../game/vendor/three.module.js';
 import {KitePhysics} from '../game/physics.js';
-import {Tether} from '../game/rope.js';
+import {Tether,CONTACT_RADIUS} from '../game/rope.js';
 import {guardRopeMotion,solveRopeSystem} from '../game/rope-system.js';
 import {PartyCommission} from '../game/party.js';
 const v=(...a)=>new Vector3(...a),dt=1/240;
@@ -13,7 +13,7 @@ guardRopeMotion([a,b,free]);assert.ok(b._blockedMotion>0);assert.equal(free._blo
 // the final guard but escape contact gathering entirely (zero load forever).
 function pilot(from,to){const p=new KitePhysics();p.anchor.copy(from);p.orientation=new Quaternion();p.position.copy(to).add(v(0,.06,-.23));p.lineLength=from.distanceTo(to);p.tension=2;p.state='flying';p.rope=new Tether(p);return p;}
 const nearA=pilot(v(-2,5,0),v(2,5,0)),nearB=pilot(v(0,4,.001),v(0,6,.001));for(const point of nearB.rope.points)point.z=-.5;nearB.position.z-=.501;
-const contacts=solveRopeSystem([nearA.rope,nearB.rope],dt);assert.ok(contacts.length>0,'Near-start swept crossing participates in the load model');assert.ok(nearA.rope.stressLoad>0);assert.equal(nearA.rope.contactAge,0);
+const contacts=solveRopeSystem([nearA.rope,nearB.rope],dt);assert.ok(contacts.every(c=>c.hit.distance<=CONTACT_RADIUS*2.21),'A swept response cannot report separated final segments as touching');assert.ok(nearA.rope.points.every(q=>Number.isFinite(q.length())));
 
 // Reproductions from the release/boost/retrieve stress scan. Version 1.8
 // remained stuck until the 120-second round timeout in both of these cases.

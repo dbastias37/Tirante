@@ -1,5 +1,5 @@
 import {solveRopeSystem} from './rope-system.js';
-import {mixSeed} from './line-stress.js';
+import {mixSeed,applyCrossingAbrasion} from './line-stress.js';
 import {controlNPC} from './npc-pilot.js';
 import {Vector3} from './vendor/three.module.js';
 import {KitePhysics,DEFAULT_SETUP,clamp} from './physics.js';
@@ -63,21 +63,13 @@ export class Commission {
       // Abrasion requires physical contact, normal pressure and actual sliding.
       // The same friction work wears both materials at their current coordinates.
       // Alternating strokes repeatedly revisit a small patch; holding still costs 0.
-      if(p.tension>.08&&b.tension>.08){
-        const alternating=Math.max(this.playerStroke.factor(this.elapsed),this.rivalStroke.factor(this.elapsed));
-        const work=.36*contact.load*contact.slip*alternating;
-        // The moving strand presents fresh fibres; its stroke works mainly
-        // into the opposing patch. Symmetric rules for player and NPC.
-        const pa=Math.abs(p.rope.feedDelta)*this.playerStroke.factor(this.elapsed),ba=Math.abs(b.rope.feedDelta)*this.rivalStroke.factor(this.elapsed),total=pa+ba;
-        p.rope.abrade(hit.i,hit.s,work*(.2+.8*(total?ba/total:0)));
-        b.rope.abrade(hit.j,hit.t,work*(.2+.8*(total?pa/total:0)));
-      }
+      applyCrossingAbrasion(p.rope,b.rope,hit,contact,dt,this.playerStroke.factor(this.elapsed),this.rivalStroke.factor(this.elapsed));
       this.playerHealth=p.rope.integrity;this.rivalHealth=b.rope.integrity;
       this.message=p.rope.stressRatio>.8?'Tu hilo está al límite · mantén Q para descargar.':contact.load<.04?'Cruce flojo · recoge suavemente antes de atacar.':'Tensa y da un tirón para cargar el cruce; el hilo más exigido puede cortarse, incluso el tuyo.';
     }else{
       if(this.elapsed-this.playerStroke.lastReversal>1){this.playerStroke.direction=0;this.playerStroke.travel=0;}
       if(this.elapsed-this.rivalStroke.lastReversal>1){this.rivalStroke.direction=0;this.rivalStroke.travel=0;}
-      this.message='Busca el contacto real con el hilo azul. Al cruzarlo, alterna Q / E o mantén F.';
+      this.message='Busca el contacto real con el hilo azul. Recoge rápido con E + Shift o alterna Q / E para desgastarlo.';
     }
     this.updateLives();this.checkOutcome();
     if(p.eliminated&&p.lives>0)this.message=`Vuelves en ${Math.max(1,Math.ceil(p.respawnAt-this.elapsed))} s · ${p.lives} vidas.`;

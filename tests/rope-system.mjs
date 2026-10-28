@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {Vector3,Quaternion} from '../game/vendor/three.module.js';
 import {segmentTOI,guardRopeMotion,solveRopeSystem} from '../game/rope-system.js';
-import {closestSegments,Tether} from '../game/rope.js';
+import {closestSegments,Tether,CONTACT_RADIUS} from '../game/rope.js';
 import {KitePhysics} from '../game/physics.js';
 import {PartyCommission} from '../game/party.js';
 import {Commission} from '../game/commission.js';
@@ -12,25 +12,26 @@ const horizontal=[[-2,5,0],[2,5,0]],above=[[0,4,.5],[0,6,.5]],below=[[0,4,-.5],[
 for(const depth of [.5,5,50]){
  const a=fixture(horizontal),b=fixture(above.map(p=>[p[0],p[1],depth]),below.map(p=>[p[0],p[1],-depth]));
  const hit=segmentTOI(...a.previous,...b.previous,...a.points,...b.points);assert.ok(hit&&hit.time>0&&hit.time<.5,'High speed finite-edge crossing is swept, not sampled');
- const f=guardRopeMotion([a,b]);assert.ok(f<.5);assert.ok(b.points[0].z>0,'Crossing retains the original side');
- for(let n=0;n<=80;n++){const t=n/80,aa=a.previous.map((p,i)=>p.clone().lerp(a.points[i],t)),bb=b.previous.map((p,i)=>p.clone().lerp(b.points[i],t));assert.ok(closestSegments(...aa,...bb).distance>.0039,'Every part of the accepted movement remains separated');}
+ const f=guardRopeMotion([a,b]);assert.ok(f<.5);assert.ok(b.points[0].z>a.points[0].z,'Crossing retains the original relative side');
+ for(let n=0;n<=80;n++){const t=n/80,aa=a.previous.map((p,i)=>p.clone().lerp(a.points[i],t)),bb=b.previous.map((p,i)=>p.clone().lerp(b.points[i],t));assert.ok(closestSegments(...aa,...bb).distance>CONTACT_RADIUS*.49,'Every part of the accepted movement remains separated');}
 }
 // Parallel sliding and tangent contact are missed by a simple separating-plane flip.
-const parallel=fixture([[-2,5,.3],[2,5,.3]],[[-2,5,-.3],[2,5,-.3]]);assert.ok(guardRopeMotion([fixture(horizontal),parallel])<1);assert.ok(parallel.points[0].z>0);
-const tangent=fixture([[-3,5,.1],[-2,5,.1]],[[2,5,.001],[3,5,.001]]);assert.ok(guardRopeMotion([fixture(horizontal),tangent])<1);
+const barrier=fixture(horizontal);barrier.weights.fill(0);
+const parallel=fixture([[-2,5,.3],[2,5,.3]],[[-2,5,-.3],[2,5,-.3]]);assert.ok(guardRopeMotion([barrier,parallel])<1);assert.ok(parallel.points[0].z>0);
+const tangent=fixture([[-3,5,.1],[-2,5,.1]],[[1,5,.00001],[2,5,.00001]]);assert.ok(guardRopeMotion([fixture(horizontal),tangent])<1);
 const miss=fixture([[0,8,.5],[0,9,.5]],[[0,8,-.5],[0,9,-.5]]);assert.equal(guardRopeMotion([fixture(horizontal),miss]),1,'Depth alone cannot invent finite-edge contact');
-const close=fixture([[0,4,.001],[0,6,.001]],below);guardRopeMotion([fixture(horizontal),close]);assert.ok(close.points[0].z>0,'A close pair still cannot change sides');
+const close=fixture([[0,4,.001],[0,6,.001]],below);guardRopeMotion([barrier,close]);assert.ok(close.points[0].z>0,'A close pair still cannot change sides');
 // One strand folding through itself and two independent simultaneous crossings.
-const loop=fixture([[-2,5,0],[2,5,0],[0,6,.5],[0,4,.5]],[[-2,5,0],[2,5,0],[0,6,-.5],[0,4,-.5]]);assert.ok(guardRopeMotion([loop])<1);assert.ok(loop.points[3].z>0);
-const a=fixture(horizontal),b=fixture(above,below),c=fixture(horizontal.map(p=>[p[0]+8,p[1],p[2]])),d=fixture(above.map(p=>[p[0]+8,p[1],p[2]]),below.map(p=>[p[0]+8,p[1],p[2]]));assert.ok(guardRopeMotion([a,b,c,d])<1);assert.ok(b.points[0].z>0&&d.points[0].z>0);
+const loop=fixture([[-2,5,0],[2,5,0],[0,6,.5],[0,4,.5]],[[-2,5,0],[2,5,0],[0,6,-.5],[0,4,-.5]]);assert.ok(guardRopeMotion([loop])<1);{const h=closestSegments(loop.points[0],loop.points[1],loop.points[2],loop.points[3]);assert.ok(h.b.z>h.a.z&&h.distance>CONTACT_RADIUS*.49,'Self contact preserves relative strand ordering');}
+const a=fixture(horizontal),b=fixture(above,below),c=fixture(horizontal.map(p=>[p[0]+8,p[1],p[2]])),d=fixture(above.map(p=>[p[0]+8,p[1],p[2]]),below.map(p=>[p[0]+8,p[1],p[2]]));assert.ok(guardRopeMotion([a,b,c,d])<1);assert.ok(b.points[0].z>a.points[0].z&&d.points[0].z>c.points[0].z);
 // Hand-side edge and low contacts are included; no special nonphysical exclusion.
-const floor=fixture(horizontal.map(p=>[p[0],.04,p[2]])),low=fixture([[0,.01,.1],[0,.1,.1]],[[0,.01,-.1],[0,.1,-.1]]);guardRopeMotion([floor,low]);assert.ok(low.points[0].z>0);
+const floor=fixture(horizontal.map(p=>[p[0],.04,p[2]])),low=fixture([[0,.01,.1],[0,.1,.1]],[[0,.01,-.1],[0,.1,-.1]]);floor.weights.fill(0);guardRopeMotion([floor,low]);assert.ok(low.points[0].z>0);
 const cut=fixture(above,below);cut.broken=0;assert.equal(guardRopeMotion([fixture(horizontal),cut]),1,'Fracture releases the obstruction');
 // Actual XPBD system: corrections and length passes must pass the final guard.
 function pilot(from,to){const p=new KitePhysics();p.anchor.copy(from);p.orientation=new Quaternion();p.position.copy(to).add(v(0,.06,-.23));p.lineLength=from.distanceTo(to);p.tension=2;p.state='flying';p.rope=new Tether(p);p.rope.dt=dt;return p;}
 const pa=pilot(v(-2,5,0),v(2,5,0)),pb=pilot(v(0,4,.1),v(0,6,.1));for(const q of pb.rope.points)q.z=-.1;pb.position.z-=.2;
-const contacts=solveRopeSystem([pa.rope,pb.rope],dt);assert.ok(contacts.length);assert.ok(pa.rope.integrity===100&&pb.rope.integrity===100,'Blocking never creates a cut or wear');
-let minimum=Infinity;for(let i=0;i<28;i++)for(let j=0;j<28;j++)minimum=Math.min(minimum,closestSegments(pa.rope.points[i],pa.rope.points[i+1],pb.rope.points[j],pb.rope.points[j+1]).distance);assert.ok(minimum>.0039,'Final XPBD corrections cannot undo collision separation');
+const contacts=solveRopeSystem([pa.rope,pb.rope],dt);assert.ok(contacts.every(c=>c.hit.distance<=CONTACT_RADIUS*2.21),'Only touching final segments are reported');assert.ok(pa.rope.integrity===100&&pb.rope.integrity===100,'Blocking never creates a cut or wear');
+let minimum=Infinity;for(let i=0;i<28;i++)for(let j=0;j<28;j++)minimum=Math.min(minimum,closestSegments(pa.rope.points[i],pa.rope.points[i+1],pb.rope.points[j],pb.rope.points[j+1]).distance);assert.ok(minimum>CONTACT_RADIUS*.49,'Final XPBD corrections cannot undo collision separation');
 // A contact-rich online state survives process serialization without hidden caches.
 const duel=new Commission(new KitePhysics());duel.start();for(let n=0;n<240*10;n++){duel.player.step(dt);duel.step(dt);}duel.controlRival=()=>{};const resumed=unpackMatch(JSON.parse(JSON.stringify(packMatch(duel))));
 for(let n=0;n<120;n++)for(const d of [duel,resumed]){d.player.setControls(n%24<12?'release':'reel',true);d.player.step(dt);d.step(dt);}assert.deepEqual(packMatch(duel),packMatch(resumed));

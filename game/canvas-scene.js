@@ -1,10 +1,11 @@
-import {bowHeight,sailZ,bridleAnchors,bridleJunction,SPAR_OFFSET} from './kite-shape.js';
+import {ArticulatedBridle,bridlePoint} from './bridle.js';
+import {bowHeight,sailZ,bridleJunction,SPAR_OFFSET} from './kite-shape.js';
 import {appearance,paperColor} from './appearance.js';
 import {cachedSailArt,texturedTriangle} from './sail-art.js';
 import {OrbitCamera} from './orbit-camera.js';
 import {spectatorView,onboardFrame} from './spectator-camera.js';
 import {ArticulatedTail} from './tail.js';
-import {reelViewport,canvasReelOutlet,foregroundLine} from './reel-view.js';
+import {reelViewport,canvasReelOutlet,foregroundLine,ReelMotion} from './reel-view.js';
 import {displayStrands} from './rope-view.js';
 import {PilotModel} from './pilot-model.js';
 import {PilotCanvas} from './pilot-canvas.js';
@@ -22,7 +23,7 @@ export class CanvasLandscape {
   constructor(canvas,physics){
     this.canvas=canvas;this.physics=physics;this.ctx=canvas.getContext('2d',{alpha:false});if(!this.ctx)throw new Error('Canvas unavailable');
     this.camera=new PerspectiveCamera(50,1,CAMERA_NEAR,CAMERA_FAR);this.targetCamera=new PerspectiveCamera();this.camera.position.set(0,1.72,1.1);this.camera.lookAt(0,3.8,-24);
-    this.forward=v();this.follow=true;this.zoom=false;this.orbit=new OrbitCamera();this.yaw=0;this.pitch=.1;this.setup={...physics.setup};this.kitePosition=v();this.kiteRotation=new Quaternion();this.tmp=v();this.tails=new WeakMap();this.pilots=Array.from({length:3},(_,i)=>new PilotModel(i));this.pilotCanvas=new PilotCanvas();
+    this.forward=v();this.follow=true;this.zoom=false;this.orbit=new OrbitCamera();this.yaw=0;this.pitch=.1;this.setup={...physics.setup};this.kitePosition=v();this.kiteRotation=new Quaternion();this.tmp=v();this.tails=new WeakMap();this.bridles=new WeakMap();this.pilots=Array.from({length:3},(_,i)=>new PilotModel(i));this.pilotCanvas=new PilotCanvas();
     const r=random(1955);
     this.trees=Array.from({length:18},(_,i)=>{const angle=i/18*Math.PI*2+(r()-.5)*.12,radius=210+r()*80;return {x:Math.sin(angle)*radius,z:Math.cos(angle)*radius,h:4+r()*5,phase:r()*6};});
     this.clouds=Array.from({length:10},()=>({x:(r()-.5)*180,y:30+r()*35,z:-80-r()*100,size:10+r()*15}));
@@ -58,8 +59,10 @@ export class CanvasLandscape {
     const corners=[[0,.4],[.4,0],[0,-.4],[-.4,0]],center=this.local(0,0,0);
     const point=([x,y],offset=0)=>this.local(x,y,sailZ(x,y,time,bend,wind)+offset);
     const facing=v(0,0,1).applyQuaternion(this.kiteRotation).dot(this.camera.position.clone().sub(this.kitePosition))>=0;
-    const junction=this.local(...bridleJunction(configuration(setup))),anchors=bridleAnchors(setup,time,bend,wind).map(a=>this.local(...a));
-    const drawBridle=()=>anchors.forEach((a,i)=>{this.line([a,junction],'#e5d9ae',.8);const key=['knotsLeft','knotsRight','knotsLower'][i];for(let k=0;k<setup[key];k++){const knot=this.project(a.clone().lerp(junction,.38+k*.11));if(knot.z>1)continue;c.beginPath();c.arc(knot.x,knot.y,1.5,0,Math.PI*2);c.fillStyle='#af7d3a';c.fill();}});
+    const junction=this.local(...bridleJunction(configuration(setup)));
+    let bridle=this.bridles.get(p);if(!bridle){bridle=new ArticulatedBridle();this.bridles.set(p,bridle);}
+    const branches=bridle.update(time,setup,this.kitePosition,this.kiteRotation,p.wind,p.velocity,bend,this.kiteScale,intro?.5:p.tension);
+    const drawBridle=()=>branches.forEach((branch,i)=>{this.line(branch.map(q=>this.local(q.x,q.y,q.z)),'#e5d9ae',.65);const key=['knotsLeft','knotsRight','knotsLower'][i];for(let k=0;k<setup[key];k++){const q=bridlePoint(branch,.38+k*.11),knot=this.project(this.local(q.x,q.y,q.z));if(knot.z>1)continue;c.beginPath();c.arc(knot.x,knot.y,1.5,0,Math.PI*2);c.fillStyle='#af7d3a';c.fill();}});
     const drawSpars=()=>{
       this.line([point([0,-.4],SPAR_OFFSET),point([0,.4],SPAR_OFFSET)],'#94744f',1.2);
       this.line(Array.from({length:21},(_,i)=>{const x=-.4+i*.04;return point([x,bowHeight(x)],SPAR_OFFSET);}), '#94744f',1.3);
@@ -78,7 +81,7 @@ export class CanvasLandscape {
     }else for(let i=0;i<4;i++)this.polygon([center,point(corners[i]),point(corners[(i+1)%4])],a.sailStyle==='classic'&&i%2?'#f8efd8':color);
     c.restore();
     if(facing)drawBridle();else drawSpars();
-    this.line([...corners,corners[0]].map(p=>point(p)),'#8f7b5844',.7);
+    this.line([...corners,corners[0]].map(p=>point(p)),'#f2e8ce2e',.4);
     if(setup.tail){let tail=this.tails.get(p);if(!tail){tail=new ArticulatedTail();this.tails.set(p,tail);}const points=tail.update(time,this.kitePosition,this.kiteRotation,p.wind,p.velocity,this.kiteScale);this.line(tail.points,color,1.9);for(let i=4;i<=20;i+=4){const q=points[i],twist=Math.sin(time*4-i*.6),x=Math.cos(twist)*.047,z=Math.sin(twist)*.047;this.polygon([this.local(q.x,q.y,q.z),this.local(q.x-x,q.y+.023,q.z-z),this.local(q.x-x,q.y-.023,q.z-z)],color);this.polygon([this.local(q.x,q.y,q.z),this.local(q.x+x,q.y+.023,q.z+z),this.local(q.x+x,q.y-.023,q.z+z)],color);}}
     return junction;
   }
@@ -98,7 +101,7 @@ export class CanvasLandscape {
     const r=p.rope,c=this.ctx,drawn=displayStrands(r,p===this.physics&&this.reelLinePoints?this.reelLinePoints:r.points,r._drawCache||=[]),points=drawn.points.map(q=>this.project(q));
     for(let i=0;i<points.length-1;i++){
       if(i===drawn.broken)continue;const a=points[i],b=points[i+1];if(a.z>1||b.z>1)continue;
-      const worn=r.broken<0?r.wearAt(i):0,contact=r.contactAge<.1&&Math.abs(i-r.contactEdge)<2;
+      const edge=drawn.sourceEdges?.[i]??i,worn=r.broken<0&&edge>=0?r.wearAt(edge):0,contact=edge>=0&&r.contactEdge>=0&&r.contactAge<.1&&Math.abs(edge-r.contactEdge)<2;
       const thickness=(p.equipment?.thread.diameter||.5)/.5;c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.strokeStyle=worn>.25?'#df9a5e':contact?'#ffe4a0':color;c.lineWidth=(contact?1.2:.85)*thickness;c.stroke();
       if(worn>.2){const x=(a.x+b.x)*.5,y=(a.y+b.y)*.5;c.beginPath();c.moveTo(x-3,y+4);c.lineTo(x,y);c.lineTo(x+4,y+3);c.lineWidth=.8;c.stroke();}
     }
@@ -110,9 +113,9 @@ export class CanvasLandscape {
     c.save();c.translate(x,y+Math.sin(time*1.6)*1.2);c.scale(scale,scale);c.rotate(-.15);
     c.fillStyle='#80583a';c.beginPath();c.ellipse(-32,-12,19,46,-.05,0,Math.PI*2);c.fill();
     const thread=c.createLinearGradient(0,-52,0,28);thread.addColorStop(0,'#e3d5ac');thread.addColorStop(.4,'#c9bb92');thread.addColorStop(1,'#a1926c');c.fillStyle=thread;c.beginPath();c.roundRect(-32,-48,68,73,9);c.fill();
-    const threadShift=this.physics.action==='hold'?0:time*(this.physics.boost?30:12)*(this.physics.action==='reel'?1:-1);
+    const reelAngle=(this.reelMotion||=new ReelMotion()).update(this.physics),threadShift=reelAngle*6;
     c.strokeStyle='#aa9b7370';c.lineWidth=1;for(let i=0;i<18;i++){const tx=-29+((i*3.6+threadShift)%64+64)%64;c.beginPath();c.moveTo(tx,-45);c.quadraticCurveTo(tx+7,-9,tx,22);c.stroke();}
-    const equipment=equipmentStats(this.setup);c.fillStyle=equipment.reel.color;c.beginPath();c.ellipse(37,-12,22,47,-.05,0,Math.PI*2);c.fill();c.strokeStyle=equipment.reel.rim;c.lineWidth=2.5;c.stroke();for(let i=0;i<equipment.reel.holes;i++){const angle=i/equipment.reel.holes*Math.PI*2+threadShift*.02;c.fillStyle='#63513a';c.beginPath();c.ellipse(37+Math.cos(angle)*13,-12+Math.sin(angle)*29,equipment.reel.holes===8?3.5:4.4,equipment.reel.holes===8?6:8,-.05,0,Math.PI*2);c.fill();}
+    const equipment=equipmentStats(this.setup);c.fillStyle=equipment.reel.color;c.beginPath();c.ellipse(37,-12,22,47,-.05,0,Math.PI*2);c.fill();c.strokeStyle=equipment.reel.rim;c.lineWidth=2.5;c.stroke();for(let i=0;i<equipment.reel.holes;i++){const angle=i/equipment.reel.holes*Math.PI*2+reelAngle;c.fillStyle='#63513a';c.beginPath();c.ellipse(37+Math.cos(angle)*13,-12+Math.sin(angle)*29,equipment.reel.holes===8?3.5:4.4,equipment.reel.holes===8?6:8,-.05,0,Math.PI*2);c.fill();}
     c.fillStyle='#735538';c.beginPath();c.ellipse(37,-12,6,12,-.05,0,Math.PI*2);c.fill();
     c.restore();
     return canvasReelOutlet(this.width,this.height,time);

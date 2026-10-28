@@ -2,24 +2,32 @@ import {Vector3} from './vendor/three.module.js';
 import {closestSegments,CONTACT_RADIUS} from './rope.js';
 import {visitRopePairs as pairs} from './rope-broadphase.js';
 import {resolveLineStress} from './line-stress.js';
-const GAP=CONTACT_RADIUS*2,SKIN=GAP*1.25,GUARD=GAP*.25;
+const GAP=CONTACT_RADIUS*2,SKIN=GAP*1.1,GUARD=GAP*.25;
 const v=()=>new Vector3();
 // Conservative advancement: the distance between two deforming segments is
 // Lipschitz bounded by their maximum relative endpoint displacement. No plane
-// sign approximation, fixed temporal samples, or missed tangential crossings.
+// sign approximation or fixed temporal samples. A verified distance is required.
 export function segmentTOI(a0,a1,b0,b1,A0,A1,B0,B1,radius=GUARD){
   const da=A0.clone().sub(a0),db=A1.clone().sub(a1),dc=B0.clone().sub(b0),dd=B1.clone().sub(b1);
   const common=da.clone().add(db).add(dc).add(dd).multiplyScalar(.25);
   const speed=Math.max(da.clone().sub(common).length(),db.clone().sub(common).length())+Math.max(dc.clone().sub(common).length(),dd.clone().sub(common).length());
   let t=0,hit;const x=v(),y=v(),u=v(),w=v();
-  for(let n=0;n<64;n++){
+  for(let n=0;n<96;n++){
     x.copy(a0).addScaledVector(da,t);y.copy(a1).addScaledVector(db,t);u.copy(b0).addScaledVector(dc,t);w.copy(b1).addScaledVector(dd,t);hit=closestSegments(x,y,u,w);
     if(hit.distance<=radius+1e-7)return {...hit,time:t};
     if(speed<1e-12)return null;
     const advance=.8*(hit.distance-radius)/speed;if(t+advance>1)return null;t+=advance;
   }
-  // An unresolved grazing case is blocked conservatively, never waved through.
-  return {...hit,time:t};
+  // Narrow an unresolved grazing interval with the same Lipschitz bound.
+  // A broad-phase/iteration-budget candidate is never itself a contact.
+  const at=u=>closestSegments(a0.clone().addScaledVector(da,u),a1.clone().addScaledVector(db,u),b0.clone().addScaledVector(dc,u),b1.clone().addScaledVector(dd,u));
+  const stack=[[t,1]];let budget=512;
+  while(stack.length&&budget--){const [lo,hi]=stack.pop(),mid=(lo+hi)/2,h=at(mid);
+    if(h.distance<=radius+1e-7)return {...h,time:mid};
+    if(h.distance-speed*(hi-lo)/2>radius||hi-lo<1e-10)continue;
+    stack.push([mid,hi],[lo,mid]);
+  }
+  return null;
 }
 function normalFor(a,b,h,old){
   const n=old.a.clone().sub(old.b);
@@ -52,34 +60,45 @@ function project(c,friction=false){
     if(delta.lengthSq()>1e-14){delta.setLength(Math.min(delta.length(),impulse*.24));for(let k=0;k<4;k++)rs[k].points[ids[k]].addScaledVector(delta,rs[k].weights[ids[k]]*wa[k]/mass*(k<2?-1:1));}
   }
 }
-// Final acceptance guard is applied after every length/contact correction.
-// It also includes endpoints, the hand-side edges and self contacts. If an
-// unresolved tangle blocks motion, it remains blocked until it slides free or
-// abrasion or excess tension fractures a strand. No rope reset or teleport.
+// Continuous local contact projection removes closing normal motion only.
+// Tangential travel, free particles and unrelated strands continue to move.
+// Repeat after each new constraint because several cords may meet at one point.
 export function guardRopeMotion(ropes,blockedContacts=null){
-  // A collision must not stop an unrelated kite. Connect ALL overlapping swept
-  // bounds, not only actual hits: independently shortened trajectories then
-  // cannot create a new collision between disconnected components.
-  const parent=ropes.map((_,i)=>i),limits=ropes.map(()=>1),root=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
+  const desired=ropes.map(r=>r.points.map(p=>p.clone()));let accepted=1;
   for(const r of ropes){r._blockedMotion=0;r._blockedTravel=0;}
-  pairs(ropes,true,GUARD,(a,b)=>{
-    const ra=root(a.ri),rb=root(b.ri);if(ra!==rb){parent[rb]=ra;limits[ra]=Math.min(limits[ra],limits[rb]);}
-    const ap=a.r.previous,bp=b.r.previous,aq=a.r.points,bq=b.r.points;
-    const initial=closestSegments(ap[a.i],ap[a.i+1],bp[b.i],bp[b.i+1]);
-    // A too-close starting pair still retains its side. Only an exactly
-    // intersecting spawn has no previous ordering; the projection repairs it.
-    if(initial.distance<1e-10)return;
-    const radius=Math.min(GUARD,initial.distance*.5);
-    const h=segmentTOI(ap[a.i],ap[a.i+1],bp[b.i],bp[b.i+1],aq[a.i],aq[a.i+1],bq[b.i],bq[b.i+1],radius);
-    if(h){limits[root(a.ri)]=Math.min(limits[root(a.ri)],h.time*.9);if(blockedContacts)blockedContacts.push({a:a.ri,b:b.ri,ra:a.r,rb:b.r,i:a.i,j:b.i,s:h.s,t:h.t,normal:normalFor(a,b,h,h),swept:true,correction:0});}
-  });
-  let minimum=1;
-  for(let k=0;k<ropes.length;k++){const r=ropes[k],fraction=limits[root(k)];if(r.broken>=0)continue;minimum=Math.min(minimum,fraction);if(fraction>=1)continue;
-    const end=r.points.at(-1).clone();r._blockedTravel=end.distanceTo(r.previous.at(-1))*(1-fraction);
-    for(let i=0;i<r.points.length;i++)r.points[i].copy(r.previous[i].clone().lerp(r.points[i],fraction));r.owner.anchor.copy(r.points[0]);r.owner.position.add(r.points.at(-1).clone().sub(end));r.owner.velocity?.multiplyScalar(fraction);r._blockedMotion=1-fraction;
+  for(let pass=0;pass<12;pass++){
+    let changed=0;
+    pairs(ropes,true,GUARD,(a,b)=>{
+      const ap=a.r.previous,bp=b.r.previous,aq=a.r.points,bq=b.r.points;
+      const initial=closestSegments(ap[a.i],ap[a.i+1],bp[b.i],bp[b.i+1]);
+      if(initial.distance<1e-10)return;
+      const radius=Math.min(GUARD,initial.distance*.5);
+      const h=segmentTOI(ap[a.i],ap[a.i+1],bp[b.i],bp[b.i+1],aq[a.i],aq[a.i+1],bq[b.i],bq[b.i+1],radius);
+      if(!h)return;
+      const c={a:a.ri,b:b.ri,ra:a.r,rb:b.r,i:a.i,j:b.i,s:h.s,t:h.t,normal:normalFor(a,b,h,h),swept:true,correction:0};
+      const p=aq[a.i].clone().lerp(aq[a.i+1],h.s),q=bq[b.i].clone().lerp(bq[b.i+1],h.t);
+      const weights=[1-h.s,h.s,1-h.t,h.t],ids=[a.i,a.i+1,b.i,b.i+1],rs=[a.r,a.r,b.r,b.r];
+      const mass=ids.reduce((sum,id,k)=>sum+rs[k].weights[id]*weights[k]**2,0),depth=radius*1.05-p.sub(q).dot(c.normal);
+      if(mass<1e-12||depth<=1e-10)return;
+      for(let k=0;k<4;k++)rs[k].points[ids[k]].addScaledVector(c.normal,depth/mass*rs[k].weights[ids[k]]*weights[k]*(k<2?1:-1));
+      changed++;accepted=Math.min(accepted,h.time);if(blockedContacts)blockedContacts.push(c);
+    });
+    if(!changed)break;
   }
-  return minimum;
+  for(let k=0;k<ropes.length;k++){
+    const r=ropes[k];if(r.broken>=0)continue;
+    for(let i=0;i<r.points.length;i++){
+      const correction=r.points[i].distanceTo(desired[k][i]);if(correction<1e-10)continue;
+      r._blockedTravel=Math.max(r._blockedTravel,correction);
+      r._blockedMotion=Math.max(r._blockedMotion,Math.min(1,correction/Math.max(1e-8,desired[k][i].distanceTo(r.previous[i]))));
+    }
+    const shift=r.points.at(-1).clone().sub(desired[k].at(-1));
+    if(shift.lengthSq()>1e-18){r.owner.position.add(shift);const n=shift.normalize(),closing=r.owner.velocity?.dot(n)||0;if(closing<0)r.owner.velocity.addScaledVector(n,-closing);}
+    r.owner.anchor.copy(r.points[0]);
+  }
+  return accepted;
 }
+export function currentRopeContacts(ropes){return gather(ropes,false);}
 export function solveRopeSystem(ropes,dt){
   // A grounded kite is out of the contest. Its slack strand must not become
   // a permanent barrier: release both free ends before the collision pass.
@@ -89,19 +108,19 @@ export function solveRopeSystem(ropes,dt){
   }
   const intact=ropes.filter(r=>r.broken<0);if(!intact.length)return [];
   for(const r of intact){r._blockedMotion=0;r.dt=dt;}
-  let contacts=gather(ropes),all=[...contacts];
+  let contacts=gather(ropes);
   if(contacts.length){
     for(let pass=0;pass<6;pass++){
       for(const c of contacts)project(c,pass===0);
       if(pass<5)for(const r of intact)r.solve(1);
-      if(pass===2){const extra=gather(ropes);const keys=new Set(contacts.map(c=>`${c.a}:${c.i}:${c.b}:${c.j}`));for(const c of extra)if(!keys.has(`${c.a}:${c.i}:${c.b}:${c.j}`)){contacts.push(c);all.push(c);}}
+      if(pass===2){const extra=gather(ropes);const keys=new Set(contacts.map(c=>`${c.a}:${c.i}:${c.b}:${c.j}`));for(const c of extra)if(!keys.has(`${c.a}:${c.i}:${c.b}:${c.j}`)){contacts.push(c);}}
     }
   }
-  // Even a contact introduced by the last length correction must enter the
-  // load/stress model. Previously the guard could block it while reporting no
-  // contact, zero pressure and no possible way to wear or release the strand.
-  const blocked=[],accepted=guardRopeMotion(ropes,blocked),byPair=new Map(),strongest=new Map();
-  const keys=new Set(all.map(c=>`${c.a}:${c.i}:${c.b}:${c.j}`));for(const c of blocked)if(!keys.has(`${c.a}:${c.i}:${c.b}:${c.j}`))all.push(c);
+  // Project final motion locally, then measure the actual resulting geometry.
+  // A swept encounter that already separated is not an active HUD contact.
+  const accepted=guardRopeMotion(ropes),byPair=new Map(),strongest=new Map(),all=gather(ropes,false);
+  for(const r of intact){r.contactEdge=-1;r.contactLoad=0;r.handContact=false;r.contactMinEdge=-1;}
+  for(const c of all)for(const [r,edge]of [[c.ra,c.i],[c.rb,c.j]]){if(edge===0)r.handContact=true;r.contactMinEdge=r.contactMinEdge<0?edge:Math.min(r.contactMinEdge,edge);}
   // Aggregate geometric contacts per strand pair. Multiple vertices must not
   // multiply the same physical feed travel into artificial damage.
   for(const h of all){

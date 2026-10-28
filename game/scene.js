@@ -1,4 +1,5 @@
-import {bowHeight,sailZ,bridleAnchors,bridleJunction,SPAR_OFFSET} from './kite-shape.js';
+import {ArticulatedBridle,BRIDLE_SEGMENTS,bridlePoint} from './bridle.js';
+import {bowHeight,sailZ,bridleJunction,SPAR_OFFSET} from './kite-shape.js';
 import {appearance,paperColor} from './appearance.js';
 import {cachedSailArt,artKey} from './sail-art.js';
 import {OrbitCamera} from './orbit-camera.js';
@@ -8,7 +9,7 @@ import {equipmentStats} from './equipment.js';
 import {createReelModel,disposeModel} from './equipment-models.js';
 import {TrailView,drawCanvasTrail} from './trail-view.js';
 import {frameDuel,positionView,pilotFocusTarget} from './duel-camera.js';
-import {reelViewport,foregroundLine} from './reel-view.js';
+import {reelViewport,foregroundLine,ReelMotion} from './reel-view.js';
 import {ROPE_DRAW_SEGMENTS} from './rope.js';
 import {displayStrands,LOOSE_SUBDIVISIONS} from './rope-view.js';
 import {PilotModel} from './pilot-model.js';
@@ -43,9 +44,9 @@ export class PaperKite {
     const makeLine=(points,material=lineMaterial)=>{const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),material);this.group.add(l);return l;};
     this.spine=makeLine([v3(0,-.4,SPAR_OFFSET),v3(0,.4,SPAR_OFFSET)]);
     this.bow=makeLine(Array.from({length:21},(_,i)=>v3(-.4+i*.04,bowHeight(-.4+i*.04),SPAR_OFFSET)));
-    this.edge=makeLine([...corners,corners[0]]);
-    for(let i=0;i<3;i++)this.strings.push(makeLine([v3(),v3()],new THREE.LineBasicMaterial({color:0xe5dbad})));
-    this.group.add(this.knots);
+    this.edge=makeLine([...corners,corners[0]],new THREE.LineBasicMaterial({color:0xf2e8ce,transparent:true,opacity:.18,depthWrite:false}));
+    for(let i=0;i<3;i++)this.strings.push(makeLine(Array.from({length:BRIDLE_SEGMENTS+1},()=>v3()),new THREE.LineBasicMaterial({color:0xe5dbad})));
+    this.group.add(this.knots);this.bridleSimulation=new ArticulatedBridle();
     this.tailSimulation=new ArticulatedTail();this.tailWind=v3();const tailGeo=new THREE.BufferGeometry();tailGeo.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(TAIL_VERTICES*3),3));
     this.tail=new THREE.Mesh(tailGeo,new THREE.MeshStandardMaterial({color:PALETTE.terracotta,side:THREE.DoubleSide,roughness:1}));
     this.group.add(this.tail);this.junction=v3(0,-.06,.23);this.setup=null;
@@ -70,16 +71,16 @@ export class PaperKite {
     });
     this.updateBridle(0,0,0);
   }
-  updateBridle(time,bend,wind){
-    const anchors=bridleAnchors(this.setup,time,bend,wind).map(p=>v3(...p));
-    this.strings.forEach((line,i)=>{const p=line.geometry.attributes.position;p.setXYZ(0,...anchors[i].toArray());p.setXYZ(1,...this.junction.toArray());p.needsUpdate=true;line.geometry.computeBoundingSphere();});
-    for(const bead of this.knots.children)bead.position.copy(anchors[bead.userData.anchor]).lerp(this.junction,bead.userData.t);
+  updateBridle(time,bend,wind,physics=null){
+    const branches=this.bridleSimulation.update(time,this.setup,this.group.position,this.group.quaternion,physics?.wind||v3(0,0,-wind),physics?.velocity,bend,this.group.scale.x,physics?.tension??.5);
+    this.strings.forEach((line,i)=>{const p=line.geometry.attributes.position;branches[i].forEach((q,k)=>p.setXYZ(k,q.x,q.y,q.z));p.needsUpdate=true;line.geometry.computeBoundingSphere();});
+    for(const bead of this.knots.children)bead.position.copy(bridlePoint(branches[bead.userData.anchor],bead.userData.t));
   }
   animate(time,bend,wind,physics=null){
     for(const panel of this.panels){const p=panel.geometry.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i);p.setZ(i,sailZ(x,y,time,bend,wind));}p.needsUpdate=true;panel.geometry.computeVertexNormals();}
     const bp=this.bow.geometry.attributes.position;for(let i=0;i<bp.count;i++)bp.setZ(i,sailZ(bp.getX(i),bp.getY(i),time,bend,wind)+SPAR_OFFSET);bp.needsUpdate=true;
     const ep=this.edge.geometry.attributes.position;for(let i=0;i<ep.count;i++)ep.setZ(i,sailZ(ep.getX(i),ep.getY(i),time,bend,wind));ep.needsUpdate=true;
-    this.updateBridle(time,bend,wind);
+    this.updateBridle(time,bend,wind,physics);
     if(this.tail.visible){this.tailSimulation.update(time,this.group.position,this.group.quaternion,physics?.wind||this.tailWind.set(0,0,-wind),physics?.velocity,this.group.scale.x);const p=this.tail.geometry.attributes.position;this.tailSimulation.fill(p,time);p.needsUpdate=true;this.tail.geometry.computeVertexNormals();this.tail.geometry.computeBoundingSphere();}
   }
 }
@@ -163,7 +164,7 @@ export class Landscape {
   }
   prepareReel(dt,paused){
     const p=this.physics,box=reelViewport(this.width,this.height);
-    if(!paused&&p.action!=='hold')this.spool.rotation.z+=dt*(p.action==='reel'?3:-3)*(p.boost?2.5:1);
+    this.spool.rotation.z=(this.reelMotion||=new ReelMotion()).update(p,paused);
     this.reelRig.position.y=-Math.sin(clamp((p.time-p.lastTug)/.2,0,1)*Math.PI)*.06;
     this.reelScene.updateMatrixWorld(true);this.reelCamera.updateMatrixWorld(true);
     const projected=this.reelOutlet.getWorldPosition(new THREE.Vector3()).project(this.reelCamera);
@@ -183,10 +184,10 @@ export class Landscape {
     const tint=new THREE.Color();
     for(let i=0;i<points.length-1;i++){
       if(i===drawn.broken)continue;
-      const wear=r.broken<0?r.wearAt(i):0,contact=r.contactAge<.1&&Math.abs(i-r.contactEdge)<2;
+      const edge=drawn.sourceEdges?.[i]??i,wear=r.broken<0&&edge>=0?r.wearAt(edge):0,contact=edge>=0&&r.contactEdge>=0&&r.contactAge<.1&&Math.abs(edge-r.contactEdge)<2;
       tint.set(wear>.25?0xdf9a5e:contact?0xffd78e:p===this.physics?0xf8efc8:p.partyTint||0x64aaa8);
       for(const id of [i,i+1]){this._temp.copy(points[id]);attr.setXYZ(index,this._temp.x,this._temp.y,this._temp.z);colors.setXYZ(index++,tint.r,tint.g,tint.b);}
-      if(wear>.2&&fi<116){this._temp.copy(r.points[i]).lerp(r.points[i+1],.5);const q=this._temp,size=.025+wear*.035;fray.setXYZ(fi++,q.x-size,q.y+size,q.z);fray.setXYZ(fi++,q.x,q.y,q.z);fray.setXYZ(fi++,q.x,q.y,q.z);fray.setXYZ(fi++,q.x+size,q.y+size*.6,q.z+.02);}
+      if(wear>.2&&fi<116){this._temp.copy(r.points[edge]).lerp(r.points[edge+1],.5);const q=this._temp,size=.025+wear*.035;fray.setXYZ(fi++,q.x-size,q.y+size,q.z);fray.setXYZ(fi++,q.x,q.y,q.z);fray.setXYZ(fi++,q.x,q.y,q.z);fray.setXYZ(fi++,q.x+size,q.y+size*.6,q.z+.02);}
     }
     attr.needsUpdate=true;colors.needsUpdate=true;line.geometry.setDrawRange(0,index);fray.needsUpdate=true;line.userData.fray.geometry.setDrawRange(0,fi);line.userData.fray.visible=line.visible;
     const ribbon=line.userData.ribbon;if(ribbon){const vertices=ribbon.geometry.attributes.position,shades=ribbon.geometry.attributes.color,a=v3(),b=v3(),side=v3(),middle=v3(),normal=v3();let k=0;const thickness=(p.equipment?.thread.diameter||.5)/.5;for(let i=0;i<index;i+=2){a.fromBufferAttribute(attr,i);b.fromBufferAttribute(attr,i+1);middle.copy(a).add(b).multiplyScalar(.5);normal.subVectors(middle,this.camera.position);side.subVectors(b,a).cross(normal).normalize();if(side.lengthSq()<.1)side.set(1,0,0);const width=Math.max(.0002,normal.length()*Math.tan(this.camera.fov*Math.PI/360)*.85*thickness/this.height);side.multiplyScalar(width);for(const [point,sign]of[[a,-1],[a,1],[b,1],[a,-1],[b,1],[b,-1]]){vertices.setXYZ(k,point.x+side.x*sign,point.y+side.y*sign,point.z+side.z*sign);shades.setXYZ(k++,colors.getX(i),colors.getY(i),colors.getZ(i));}}vertices.needsUpdate=true;shades.needsUpdate=true;ribbon.geometry.setDrawRange(0,k);ribbon.visible=line.visible;}

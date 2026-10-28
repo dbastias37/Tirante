@@ -108,18 +108,18 @@ export class KitePhysics {
     const exerting=this.action==='reel'&&this.lineLength>3||this.action==='release'&&this.lineLength<this.lineCapacity;
     const cost=exerting?(this.boost?(this.action==='reel'?22:14):(this.action==='reel'?2.3+Math.min(this.tension,20)*.08:-1)): -6;
     this.energy=clamp(this.energy-cost*(cost>0?this.equipment.effort:1)*dt,0,100);
-    const drag=1/(1+this.rope.contactLoad*.12);
+    const drag=1/(1+this.rope.contactLoad*.045);
     const lineSpeed=drag*this.equipment.speed*(this.boost?LINE_BOOST:1)*(this.energy<20?.55+.45*this.energy/20:1);
     const releasing=this.action==='release'&&this.lineLength<this.lineCapacity;
     const reeling=this.action==='reel'&&this.lineLength>3;
     if(releasing)this.lineLength=Math.min(this.lineCapacity,this.lineLength+1.8*lineSpeed*dt);
-    if(reeling){this.lineLength=Math.max(3,this.lineLength-1.25*lineSpeed*dt);this.maneuverHold=Math.max(this.maneuverHold,.8);}
+    if(reeling){this.lineLength=Math.max(3,this.lineLength-1.75*lineSpeed*dt);this.maneuverHold=Math.max(this.maneuverHold,.8);}
     const rel=this._rel.copy(this.wind).sub(this.velocity), speed=rel.length();
     const flow=this._flow.copy(rel).normalize();if(speed<.001)flow.set(0,0,-1);
     const taut=clamp(this.tension/.35,0,1);
     const slack=1-taut;
     const loadedCrossing=this.rope.contactAge<.1&&this.rope.contactLoad>.1;
-    const freedom=Math.max(slack,releasing?(this.boost?1:.82)*(loadedCrossing?.12:1):0);
+    const freedom=loadedCrossing?Math.min(.10,slack):Math.max(slack,releasing?(this.boost?1:.82):0);
     const catching=this.maneuverHold>0;
     const disturbance=this.profile==='gusts'?.19:.025;
     const turnTorque=this.trim.bias*(1.4+taut*2.7)+disturbance*Math.sin(this.time*1.37);

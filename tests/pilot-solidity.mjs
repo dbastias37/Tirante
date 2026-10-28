@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {PilotModel} from '../game/pilot-model.js';
 import {KitePhysics} from '../game/physics.js';
-import {Vector3,Raycaster,Box3,FrontSide} from '../game/vendor/three.module.js';
+import {Vector3,Vector2,PerspectiveCamera,Raycaster,Box3,FrontSide} from '../game/vendor/three.module.js';
 
 const V=(x=0,y=0,z=0)=>new Vector3(x,y,z);
 function manifold(indices){
@@ -69,5 +69,19 @@ for(let index=0;index<3;index++){
     }
     assert.ok(checked);p.eliminated=false;
   }
+}
+// Regression for the dark lining patches visible on the outside of a bent
+// sleeve. Scan both side views and both LODs; isolated silhouette grazing is
+// tolerated, but an exposed interior patch may not cover 2% of the elbow.
+for(const index of [0,2])for(const side of [-1,1])for(const detail of [0,1]){
+ const p=new KitePhysics(),m=new PilotModel(index);p.launch();p.position.set(0,12,-25);m.setDetail(detail);m.update(p,0);m.group.updateMatrixWorld(true);
+ const target=m.group.position.clone().add(V(0,1.43,-.15)),camera=new PerspectiveCamera(35,400/520,.01,100);camera.position.copy(target).add(V(1.32*side,.02,-.18));camera.lookAt(target);camera.updateMatrixWorld();
+ const ray=new Raycaster(),cloth=m.garment.levels[detail],lining=cloth.geometry.userData.lining;let inside=0,outside=0;
+ for(let y=330;y<515;y+=5)for(let x=60;x<240;x+=5){
+  ray.setFromCamera(new Vector2(x/400*2-1,1-y/520*2),camera);const hit=ray.intersectObject(m.garment.mesh)[0];if(!hit)continue;
+  const ids=[hit.face.a,hit.face.b,hit.face.c],inner=ids.every(i=>i>=lining.outerVertices),rest=ids.map(i=>cloth.rest[(inner?i-lining.outerVertices:i)*3]);
+  if(!rest.every(x=>Math.abs(x)>.37&&Math.abs(x)<.61))continue;if(inner)inside++;else outside++;
+ }
+ assert.ok(outside>30);assert.ok(inside/(inside+outside)<.02,`Exposed sleeve lining: ${index}, ${side}, ${detail}: ${inside}/${outside}`);
 }
 console.log(`PASS: closed skin and fabric topology, front-face raycasts around elbows/wrists/neck, lining attachment, outward shoe heading and one-sided handle in ${poses} poses.`);

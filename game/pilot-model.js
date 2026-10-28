@@ -1,3 +1,4 @@
+import {ReelMotion} from './reel-view.js';
 import * as T from './vendor/three.module.js';
 import {PilotLocomotion,PilotTrousers,legRotation} from './pilot-locomotion.js';
 import {PilotHand} from './pilot-hands.js';
@@ -78,7 +79,7 @@ export class PilotModel{
     this.garment=new FittedGarment(['sweater','tee','hoodie'][index%3],this.top);this.group.add(this.garment.mesh);this.torso=this.garment.mesh;
     this.underbody=add(this.body,rings([[.005,.125,.073],[.20,.142,.080],[.38,.158,.080],[.455,.175,.070],[.51,.075,.058]],16),this.skin);this.underbody.name='solid-under-shirt';if(this.garment.kind==='sweater')this.underbody.scale.set(.86,1,.86);
     this.neckSurface=new PilotNeckSurface(this.skin);this.neck=this.neckSurface.mesh;this.body.add(this.neck);
-    this.head=new T.Group();this.head.position.set(0,.57,0);this.body.add(this.head);
+    this.head=new T.Group();this.head.position.set(0,.505,0);this.body.add(this.head);
     const kitHead=PILOT_KIT.heads[index%3];
     this.faceSkin=pilotTextureMaterial(kitHead.texture);
     this.headLevels=kitHead.levels.map(source=>({geometry:wardrobeGeometry(source)}));
@@ -129,7 +130,7 @@ export class PilotModel{
     const look=Math.atan2(p.position.y-1.65,Math.hypot(p.position.x-p.anchor.x,p.position.z-p.anchor.z));this.head.rotation.x=inactive?-.16:clamp(look*.55,-.25,.65);
     this.neckSurface.update(this.head);
     this.body.updateMatrix();
-    const reelRate=inactive||p.action==='hold'?0:(p.action==='reel'?1:-1)*(p.boost?8:4);this.spool.rotation.x+=dt*reelRate;
+    this.spool.rotation.x=(this.reelMotion||=new ReelMotion()).update(p);
     for(const arm of this.arms){
       const s=arm.s,a=V(s*.185,.465,0).applyMatrix4(this.body.matrix),working=p.action!=='hold'&&!inactive;
       const b=s>0?V(.16,1.24,-.325):inactive?V(-.22,1.01,-.13):V(p.action==='release'?-.124:-.114,1.18+(working?Math.sin(this.spool.rotation.x)*.006:0)+tug*.008,-.34+(working?Math.cos(this.spool.rotation.x)*.006:0)+tug*.006);
