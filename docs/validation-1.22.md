@@ -40,3 +40,17 @@ No se añaden triángulos ni grupos de dibujo a los NPC: Mateo 12.931/6.229, Alm
 ## Límites
 
 Es una simulación reducida para el juego, no una calibración experimental de hilo real. El solver tiene pasos e iteraciones acotados; las pruebas cubren los casos descritos, no una garantía matemática de todo enredo posible. Los tirantes son cadenas visuales restringidas, sin resolver contactos independientes con cada cuerda enemiga. La ropa se deforma según la postura y no usa simulación completa de tela. La revisión de navegador usa Canvas si no hay WebGL; eso no mide los FPS de una GPU real.
+
+## Comprobación en producción · 28 de octubre de 2026
+
+- Primera publicación: `35ae27799978e03348bf7cd6c09e81b6cfc9c47c`; Render `dep-dbh2ifi9lscs73800gfg`, estado `live` a las 16:57:17 UTC.
+- `/healthz`: HTTP 200, versión `1.22.0`. Los módulos de colisiones, tirantes, carrete, mangas, física e interpolación online coinciden byte a byte con los probados.
+- Navegador: título → menú → último en pie → preparación con 300 yd → partida con tres NPC. Revisados Mateo, Alma y Nico mediante cámara orbital; probados recoger con boost, soltar y doble tirón. La partida mantiene vidas y avance del reloj.
+- La revisión visual detectó una transición demasiado brusca junto al carrete al encuadrar rivales a los lados. Se amplió su recorrido vertical según la distancia lateral y se volvió a validar salida, geometría de contacto y renderizado. Esta afinación no modifica las coordenadas físicas.
+- Entorno de navegador con Canvas. Sin excepciones nuevas de la lógica del juego; los mensajes de la extensión del navegador son ajenos al juego. No se afirma una medición de FPS en GPU.
+
+Capturas reales de la versión publicada:
+
+![Mateo: cuello más corto y manga continua](tirante-1-22-mateo.jpg)
+
+![Nico: polerón y codo corregidos](tirante-1-22-nico.jpg)

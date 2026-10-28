@@ -3,7 +3,7 @@ import {KitePhysics} from '../game/physics.js';
 import {Tether,closestSegments,CONTACT_RADIUS} from '../game/rope.js';
 import {guardRopeMotion,solveRopeSystem} from '../game/rope-system.js';
 import {applyCrossingAbrasion} from '../game/line-stress.js';
-import {foregroundLine,ReelMotion,reelViewport} from '../game/reel-view.js';
+import {foregroundLine,canvasReelOutlet,ReelMotion,reelViewport} from '../game/reel-view.js';
 import {ArticulatedBridle,BRIDLE_SEGMENTS} from '../game/bridle.js';
 import {bridleAnchors,bridleJunction,sailZ} from '../game/kite-shape.js';
 import {configuration} from '../game/physics.js';
@@ -27,6 +27,13 @@ for(const length of [8,150,274.32,914.4])for(const yaw of [-.8,0,.8]){
  for(const i of [7,14,22])if(i>edge)assert.ok(draw[i+offset].clone().lerp(draw[i+offset+1],.37).distanceTo(raw[i].clone().lerp(raw[i+1],.37))<1e-10);
  p.rope.contactMinEdge=0;assert.equal(foregroundLine(p.rope,camera,1920,1080,{x:950,y:750}),p.rope.points);p.rope.contactMinEdge=-1;
  p.rope.handContact=true;assert.equal(foregroundLine(p.rope,camera,1920,1080,{x:950,y:750}),p.rope.points);
+}
+// Wide party framing must not introduce a right-angle elbow near the reel.
+for(const targetX of [-12,0,12]){
+ const p=new KitePhysics();p.launch();p.position.set(0,10,-8);p.lineLength=16;p.rope.reset();const c=new PerspectiveCamera(98,1363/936,.15,4000);c.position.set(0,1.72,3.65);c.lookAt(targetX,10,-10);c.updateMatrixWorld();
+ const points=foregroundLine(p.rope,c,1363,936,canvasReelOutlet(1363,936)),screen=points.map(q=>q.clone().project(c)).map(q=>v(q.x*1363,q.y*936,0));
+ assert.ok(points.physicalStart>0);
+ for(let i=1;i<=points.physicalStart;i++)assert.ok(screen[i].clone().sub(screen[i-1]).angleTo(screen[i+1].clone().sub(screen[i]))<35*Math.PI/180);
 }
 // Continuous fast friction cuts the opposing patch without a required Q/E
 // reversal. Passive and non-contact motion cannot cause an abrasion cut.
