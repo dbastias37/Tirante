@@ -1,8 +1,12 @@
 import {Vector3} from './vendor/three.module.js';
-// Centered FPS equipment, immediately above the existing controls.
+// Anchor equipment at the bottom, leaving the aiming area unobstructed.
+// Compact landscape controls flank the reel, so no legacy HUD clearance is
+// needed there. Portrait and desktop retain room for their bottom controls.
 export function reelViewport(width,height){
- const compact=width<=760||height<=560,size=Math.round(Math.max(150,Math.min(300,width*.40,height*.30))),clearance=compact?(height>560?235:120):185;
- return {size,x:Math.round((width-size)/2),y:Math.round(Math.max(15,height-clearance-size*.82))};
+ const landscape=width>height,compact=width<=760||(landscape&&height<=560);
+ const size=Math.round(Math.max(120,Math.min(compact?240:220,width*.35,height*(compact?.34:.22))));
+ const y=compact&&landscape?height-size*.72:height-(compact?74:185)-size*.95;
+ return {size,x:Math.round((width-size)/2),y:Math.round(Math.max(0,y))};
 }
 export function canvasReelOutlet(width,height,time=0){
  const box=reelViewport(width,height),scale=box.size/145,angle=-.15,x=0,y=-48;

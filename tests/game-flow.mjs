@@ -45,7 +45,14 @@ assert.equal(state.back(),'menu');state.go('settings');assert.equal(state.back()
 
 assert.ok(Math.abs(toYards(150)-164.041994750656)<1e-10);assert.equal(distanceText(65),'71,1 yd (65,0 m)');assert.match(distanceHTML(150),/164,0.*yd.*<small[^>]*>\(150,0 m\)<\/small>/);
 const select={options:[{value:'150'}]};populateCapacities(select);assert.equal(select.options[0].value,'150');assert.equal(select.options[0].textContent,'164,0 yd (150,0 m)');
-for(const [w,h]of[[1363,936],[1920,1080],[390,844],[360,640],[844,390],[568,320]]){const b=reelViewport(w,h);assert.ok(b.x>=0&&b.y>=0&&b.x<w&&b.y<h,`Reel stays visible at ${w}×${h}`);assert.ok(Math.abs(b.x+b.size/2-w/2)<1,'Foreground reel is horizontally centered');assert.ok(b.y+b.size*.82<h-80,'Reel clears the bottom controls');}
+for(const [w,h]of[[1363,936],[1920,1080],[390,844],[360,640],[844,390],[747,352],[568,320]]){
+ const b=reelViewport(w,h),compact=w<=760||(w>h&&h<=560);
+ assert.ok(b.x>=0&&b.y>=0&&b.x<w&&b.y<h,`Reel stays visible at ${w}×${h}`);
+ assert.ok(Math.abs(b.x+b.size/2-w/2)<1,'Reel is horizontally centered');
+ if(compact&&w>h){assert.ok(b.y>h*.70,'Landscape reel is anchored below the aiming area');assert.ok(b.y+b.size>h,'Lower viewport edge is cropped like FPS equipment');}
+ else assert.ok(b.y+b.size*.95<=h-(compact?73:184),'Portrait/desktop keep their controls accessible');
+}
+
 
 const landscape=Object.create(Landscape.prototype);landscape.scene=new Scene();landscape.createLandscape();const ground=landscape.scene.children.find(m=>m.geometry?.parameters?.width===FIELD_SIZE),surround=landscape.scene.children.find(m=>m.userData.groundSurround);assert.ok(ground&&surround);ground.updateMatrixWorld();surround.updateMatrixWorld();
 for(const [x,z]of[[.13,.27],[21.23,70.16],[110.15,-145.31],[180.13,249.71],[1001.31,-1181.75],[1220.13,30.27],[-1501.1,1402.3]]){const ray=new Raycaster(new Vector3(x,100,z),new Vector3(0,-1,0)),hits=ray.intersectObjects([ground,surround]);assert.equal(hits.length,1,`Exactly one ground surface at ${x},${z}`);}
@@ -53,6 +60,13 @@ for(let x=-FIELD_SIZE/2;x<=FIELD_SIZE/2;x+=13){assert.ok(terrainHeight(x,FIELD_S
 landscape.physics=new KitePhysics();landscape.createReel();assert.equal(landscape.reelRig.children.filter(o=>o.children.length).length,1);assert.equal(landscape.spool.children.length,1,'First-person rig contains the reel only');assert.equal(landscape.scene.children.includes(landscape.reelRig),false,'Viewmodel is independent from world camera motion');
 
 const draws=[],viewports=[];landscape.width=1363;landscape.height=936;landscape.renderer={autoClear:true,clearDepth(){},setViewport(...args){viewports.push(args);},render(scene,camera){draws.push([scene,camera]);}};const anchor=landscape.physics.anchor.clone();landscape.renderReel(1/60,false);assert.equal(draws[0][0],landscape.reelScene);assert.deepEqual(viewports.at(-1),[0,0,1363,936]);assert.equal(landscape.renderer.autoClear,true);assert.equal(landscape.physics.anchor.distanceTo(anchor),0,'Viewmodel never relocates the simulated line');
+
+// Actual rotated reel geometry stays near the lower edge on landscape phones.
+for(const [w,h]of [[844,390],[747,352],[568,320]])for(const angle of [0,Math.PI/3,Math.PI]){
+ const box=reelViewport(w,h);landscape.spool.rotation.z=angle;landscape.reelScene.updateMatrixWorld(true);landscape.reelCamera.updateMatrixWorld(true);
+ let top=Infinity,bottom=-Infinity;landscape.reelModel.traverse(part=>{if(!part.geometry)return;const p=part.geometry.attributes.position;for(let i=0;i<p.count;i++){const q=new Vector3().fromBufferAttribute(p,i).applyMatrix4(part.matrixWorld).project(landscape.reelCamera),y=box.y+(.5-q.y*.5)*box.size;top=Math.min(top,y);bottom=Math.max(bottom,y);}});
+ assert.ok(top>h*.73,'The visible reel cannot cover the central aiming area');assert.ok(bottom>h*.94&&top<h,'The reel remains present at the bottom');
+}
 
 const p=new KitePhysics();p.launch();p.position.set(0,60,-30);p.velocity.set(12,8,-14);const before=p.position.clone(),direction=p.velocity.clone().normalize();p.cutLine();assert.ok(p.velocity.length()<=8+1e-10);assert.ok(p.velocity.clone().normalize().distanceTo(direction)<1e-10);assert.equal(p.position.distanceTo(before),0,'A cut does not teleport the kite');p.profile='strong';p.windSpeed=12;
 for(let i=0;i<240;i++){const velocity=p.velocity.clone();p.step(1/240);assert.ok(Math.hypot(p.velocity.x-velocity.x,p.velocity.z-velocity.z)<=4/240+1e-9,'Gust pickup remains smooth');assert.ok(Number.isFinite(p.position.length()));}

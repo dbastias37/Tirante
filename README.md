@@ -1,6 +1,6 @@
 # TIRANTE · El pulso del viento
 
-Simulador de volantines, versión 1.22.0, publicado desde este repositorio en Render.
+Simulador de volantines, versión 1.22.1, publicado desde este repositorio en Render.
 
 ## Instalación actual en Render
 
@@ -22,6 +22,12 @@ La instalación actual usa el plan gratuito, una instancia y `DATA_DIR=/tmp/tira
 - Party local contra 1–3 NPC, Rastro de luz contrarreloj y duelo online para dos personas.
 - Interfaz compacta para móvil, renderer WebGL y alternativa Canvas.
 - Servidor Node.js, base SQLite, almacenamiento de estampados y pruebas automatizadas.
+
+## Corrección 1.22.1
+
+- Carrete anclado abajo en móviles horizontales, con el borde inferior parcialmente fuera de pantalla. Se elimina el espacio reservado para el panel antiguo que lo dejaba cerca del centro de mira.
+- Tamaño más contenido y separación de los controles en vertical/escritorio. WebGL y Canvas comparten la misma posición y salida del hilo.
+- Comprobada la geometría proyectada del carrete en tres tamaños de móvil horizontal, además de salida de hilo, rotación y renderizado.
 
 ## Cambios de la versión 1.22.0
 
